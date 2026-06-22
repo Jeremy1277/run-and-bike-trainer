@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Run & Bike Trainer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #f4f1ea;
+    --bg-card: #ffffff;
+    --ink: #2b2622;
+    --ink-soft: #6b6258;
+    --line: #ddd5c7;
+    --clay: #b85c38;
+    --clay-dark: #8f4427;
+    --moss: #5c7a4f;
+    --moss-dark: #3f5c38;
+    --amber: #d99a3d;
+    --red: #b8453a;
+    --shadow: rgba(43, 38, 34, 0.08);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Space Grotesk', sans-serif;
+    line-height: 1.5;
+    padding-bottom: 60px;
+  }
+
+  .mono { font-family: 'DM Mono', monospace; }
+
+  header {
+    padding: 32px 24px 24px;
+    max-width: 1100px;
+    margin: 0 auto;
+    border-bottom: 1px solid var(--line);
+  }
+
+  header .eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--clay-dark);
+    margin-bottom: 8px;
+  }
+
+  header h1 {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  header .sub {
+    color: var(--ink-soft);
+    font-size: 15px;
+    margin-top: 6px;
+  }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 20px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+  }
+
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--moss);
+    flex-shrink: 0;
+  }
+  .dot.off { background: var(--ink-soft); opacity: 0.4; }
+
+  button {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 10px 18px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.1s ease, opacity 0.15s ease;
+  }
+  button:active { transform: scale(0.97); }
+  button:disabled { opacity: 0.5; cursor: default; }
+
+  .btn-primary { background: var(--clay); color: white; }
+  .btn-primary:hover:not(:disabled) { background: var(--clay-dark); }
+  .btn-ghost { background: transparent; color: var(--ink-soft); border: 1px solid var(--line); }
+  .btn-ghost:hover { border-color: var(--ink-soft); color: var(--ink); }
+
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 80px 24px;
+    color: var(--ink-soft);
+  }
+  .empty-state h2 { color: var(--ink); font-size: 22px; margin-bottom: 8px; }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .tab {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 10px 16px;
+    cursor: pointer;
+    color: var(--ink-soft);
+    border-bottom: 2px solid transparent;
+    background: none;
+    border-radius: 0;
+  }
+  .tab.active { color: var(--clay-dark); border-bottom-color: var(--clay); }
+  .tab:hover:not(.active) { color: var(--ink); }
+
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .stat-card {
+    background: var(--bg-card);
+    border-radius: 10px;
+    padding: 16px 18px;
+    box-shadow: 0 1px 3px var(--shadow);
+  }
+
+  .stat-card .label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 6px;
+  }
+
+  .stat-card .value {
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .stat-card .value .unit {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    margin-left: 3px;
+  }
+
+  .panel {
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 1px 3px var(--shadow);
+  }
+
+  .panel h3 {
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .panel .panel-sub {
+    color: var(--ink-soft);
+    font-size: 13px;
+    margin-bottom: 18px;
+  }
+
+  /* Activity rows */
+  .activity-row {
+    display: grid;
+    grid-template-columns: 90px 1fr 80px 80px 80px 70px;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 14px;
+  }
+  .activity-row:last-child { border-bottom: none; }
+  .activity-row .date {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  .activity-row .name {
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .activity-row .metric {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    text-align: right;
+    color: var(--ink-soft);
+  }
+  .activity-row .metric strong { color: var(--ink); font-weight: 500; }
+
+  .row-head {
+    display: grid;
+    grid-template-columns: 90px 1fr 80px 80px 80px 70px;
+    gap: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--ink);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .row-head .metric { text-align: right; }
+
+  /* Zone bars */
+  .zone-bar-track {
+    height: 28px;
+    border-radius: 6px;
+    background: var(--bg);
+    overflow: hidden;
+    display: flex;
+    margin-bottom: 6px;
+  }
+  .zone-seg {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: white;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  /* Progress callouts */
+  .insight {
+    display: flex;
+    gap: 14px;
+    padding: 16px;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    align-items: flex-start;
+  }
+  .insight.up { background: rgba(92, 122, 79, 0.1); }
+  .insight.down { background: rgba(184, 69, 58, 0.1); }
+  .insight.neutral { background: var(--bg); }
+
+  .insight .icon {
+    font-family: 'DM Mono', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    width: 28px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .insight.up .icon { color: var(--moss-dark); }
+  .insight.down .icon { color: var(--red); }
+  .insight.neutral .icon { color: var(--ink-soft); }
+
+  .insight .text { font-size: 14px; }
+  .insight .text strong { font-weight: 600; }
+  .insight .text .detail { color: var(--ink-soft); font-size: 13px; margin-top: 2px; }
+
+  /* Chart canvas */
+  canvas { width: 100% !important; }
+
+  .loading-msg {
+    text-align: center;
+    padding: 60px;
+    color: var(--ink-soft);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+  }
+
+  @media (max-width: 640px) {
+    .activity-row, .row-head {
+      grid-template-columns: 70px 1fr 60px;
+    }
+    .activity-row .metric:nth-child(4),
+    .activity-row .metric:nth-child(5),
+    .row-head .metric:nth-child(4),
+    .row-head .metric:nth-child(5) {
+      display: none;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Run &amp; Bike Trainer</div>
+  <h1>Tableau de bord</h1>
+  <div class="sub">Vélo gravel &amp; course à pied — analyse de progression</div>
+  <div class="status-bar">
+    <div class="dot off" id="statusDot"></div>
+    <span id="statusText">Connexion...</span>
+    <button class="btn-ghost" id="syncBtn" style="margin-left: auto;">Sync</button>
+    <button class="btn-primary" id="connectBtn" style="display:none;">Se connecter à Strava</button>
+  </div>
+</header>
+
+<main>
+  <div id="emptyState" class="empty-state" style="display:none;">
+    <h2>Pas encore connecté</h2>
+    <p>Connecte ton compte Strava pour voir tes données.</p>
+  </div>
+
+  <div id="loadingState" class="loading-msg">Chargement des activités...</div>
+
+  <div id="content" style="display:none;">
+    <div class="tabs">
+      <button class="tab active" data-tab="velo">Vélo</button>
+      <button class="tab" data-tab="course">Course à pied</button>
+    </div>
+
+    <div class="section active" id="section-velo"></div>
+    <div class="section" id="section-course"></div>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const API_BASE = 'https://run-and-bike-trainer-api.onrender.com';
+
+const els = {
+  statusDot: document.getElementById('statusDot'),
+  statusText: document.getElementById('statusText'),
+  syncBtn: document.getElementById('syncBtn'),
+  connectBtn: document.getElementById('connectBtn'),
+  emptyState: document.getElementById('emptyState'),
+  loadingState: document.getElementById('loadingState'),
+  content: document.getElementById('content'),
+  sectionVelo: document.getElementById('section-velo'),
+  sectionCourse: document.getElementById('section-course'),
+};
+
+let allActivities = [];
+
+// --- Utils ---
+function fmtDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+function fmtKm(meters) { return (meters / 1000).toFixed(1); }
+function fmtSpeed(mps) { return (mps * 3.6).toFixed(1); }
+function fmtDplus(meters) { return Math.round(meters); }
+function ratioDplusKm(act) {
+  const km = act.distance / 1000;
+  return km > 0 ? act.total_elevation_gain / km : 0;
+}
+
+// --- Init ---
+async function init() {
+  try {
+    const statusRes = await fetch(`${API_BASE}/api/status`);
+    const status = await statusRes.json();
+
+    if (!status.connected) {
+      els.statusText.textContent = 'Non connecté';
+      els.connectBtn.style.display = 'inline-block';
+      els.emptyState.style.display = 'block';
+      els.loadingState.style.display = 'none';
+      return;
+    }
+
+    els.statusDot.classList.remove('off');
+    els.statusText.textContent = `Connecté — ${status.athlete.firstname} ${status.athlete.lastname}`;
+
+    await loadActivities();
+  } catch (err) {
+    els.statusText.textContent = 'Erreur de connexion au serveur';
+    els.loadingState.textContent = 'Le serveur met parfois 1 minute à se réveiller (free tier). Réessaie dans un instant avec Sync.';
+  }
+}
+
+async function loadActivities() {
+  els.loadingState.style.display = 'block';
+  els.content.style.display = 'none';
+
+  const res = await fetch(`${API_BASE}/api/activities`);
+  const data = await res.json();
+  allActivities = data.activities || [];
+
+  els.loadingState.style.display = 'none';
+
+  if (allActivities.length === 0) {
+    els.emptyState.style.display = 'block';
+    els.emptyState.innerHTML = '<h2>Aucune activité</h2><p>Clique sur Sync pour récupérer tes données Strava.</p>';
+    return;
+  }
+
+  els.content.style.display = 'block';
+  render();
+}
+
+els.connectBtn.addEventListener('click', () => {
+  window.location.href = `${API_BASE}/auth/strava`;
+});
+
+els.syncBtn.addEventListener('click', async () => {
+  els.syncBtn.disabled = true;
+  els.syncBtn.textContent = 'Sync...';
+  try {
+    await fetch(`${API_BASE}/api/sync`);
+    await loadActivities();
+  } catch (err) {
+    alert('Erreur de synchronisation. Le serveur met parfois 1 minute à se réveiller, réessaie.');
+  }
+  els.syncBtn.disabled = false;
+  els.syncBtn.textContent = 'Sync';
+});
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(`section-${tab.dataset.tab}`).classList.add('active');
+  });
+});
+
+// --- Rendering ---
+function render() {
+  const rides = allActivities.filter(a => a.type === 'Ride' || a.sport_type === 'Ride' || a.sport_type === 'GravelRide')
+    .sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
+  const runs = allActivities.filter(a => a.type === 'Run' || a.sport_type === 'Run')
+    .sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
+
+  els.sectionVelo.innerHTML = renderSport(rides, 'vélo');
+  els.sectionCourse.innerHTML = renderSport(runs, 'course');
+
+  if (rides.length > 0) renderChart('chart-velo', rides);
+  if (runs.length > 0) renderChart('chart-course', runs);
+}
+
+function renderSport(activities, label) {
+  if (activities.length === 0) {
+    return `<div class="empty-state"><h2>Pas de sortie ${label}</h2><p>Rien à analyser encore.</p></div>`;
+  }
+
+  const totalKm = activities.reduce((s, a) => s + a.distance, 0) / 1000;
+  const totalDplus = activities.reduce((s, a) => s + a.total_elevation_gain, 0);
+  const totalTime = activities.reduce((s, a) => s + a.moving_time, 0);
+  const withHr = activities.filter(a => a.average_heartrate);
+  const avgHr = withHr.length ? withHr.reduce((s, a) => s + a.average_heartrate, 0) / withHr.length : null;
+
+  const chartId = label === 'vélo' ? 'chart-velo' : 'chart-course';
+
+  return `
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="label">Sorties</div>
+        <div class="value">${activities.length}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Distance totale</div>
+        <div class="value">${totalKm.toFixed(0)}<span class="unit">km</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="label">D+ total</div>
+        <div class="value">${Math.round(totalDplus)}<span class="unit">m</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Temps total</div>
+        <div class="value">${(totalTime / 3600).toFixed(0)}<span class="unit">h</span></div>
+      </div>
+      ${avgHr ? `
+      <div class="stat-card">
+        <div class="label">FC moyenne</div>
+        <div class="value">${avgHr.toFixed(0)}<span class="unit">bpm</span></div>
+      </div>` : ''}
+    </div>
+
+    ${renderInsights(activities, label)}
+
+    <div class="panel">
+      <h3>Évolution dans le temps</h3>
+      <div class="panel-sub">Vitesse moyenne et FC moyenne, sortie par sortie</div>
+      <canvas id="${chartId}" height="90"></canvas>
+    </div>
+
+    <div class="panel">
+      <h3>Dernières sorties</h3>
+      <div class="panel-sub">${activities.length} activité${activities.length > 1 ? 's' : ''} au total</div>
+      <div class="row-head">
+        <div>Date</div>
+        <div>Sortie</div>
+        <div class="metric">Dist.</div>
+        <div class="metric">D+</div>
+        <div class="metric">Vit.</div>
+        <div class="metric">FC</div>
+      </div>
+      ${activities.slice(0, 15).map(a => `
+        <div class="activity-row">
+          <div class="date">${fmtDate(a.start_date)}</div>
+          <div class="name">${a.name}</div>
+          <div class="metric"><strong>${fmtKm(a.distance)}</strong> km</div>
+          <div class="metric"><strong>${fmtDplus(a.total_elevation_gain)}</strong> m</div>
+          <div class="metric"><strong>${fmtSpeed(a.average_speed)}</strong></div>
+          <div class="metric">${a.average_heartrate ? `<strong>${Math.round(a.average_heartrate)}</strong>` : '—'}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+// --- Progression insights : compare des sorties à ratio D+/km similaire ---
+function renderInsights(activities, label) {
+  const withData = activities.filter(a => a.average_heartrate && a.average_speed && a.distance > 1000);
+  if (withData.length < 4) {
+    return `<div class="panel"><h3>Progression</h3><div class="panel-sub">Pas encore assez de données comparables (besoin d'au moins 4 sorties avec FC enregistrée).</div></div>`;
+  }
+
+  // Groupe par tranche de ratio D+/km : plat (<5), vallonné (5-15), montagneux (15+)
+  const groups = { plat: [], vallonne: [], montagneux: [] };
+  withData.forEach(a => {
+    const ratio = ratioDplusKm(a);
+    if (ratio < 5) groups.plat.push(a);
+    else if (ratio < 15) groups.vallonne.push(a);
+    else groups.montagneux.push(a);
+  });
+
+  const groupLabels = { plat: 'Terrain plat (< 5 m/km)', vallonne: 'Vallonné (5-15 m/km)', montagneux: 'Montagneux (15+ m/km)' };
+
+  let html = `<div class="panel"><h3>Progression par type de terrain</h3><div class="panel-sub">Comparaison vitesse-à-FC-équivalente entre tes 3 sorties les plus anciennes et les 3 plus récentes de chaque groupe</div>`;
+
+  let anyInsight = false;
+
+  for (const key of ['plat', 'vallonne', 'montagneux']) {
+    const group = groups[key].sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+    if (group.length < 4) continue;
+    anyInsight = true;
+
+    const half = Math.max(2, Math.floor(group.length / 2));
+    const older = group.slice(0, half);
+    const recent = group.slice(-half);
+
+    // vitesse normalisée par FC : km/h par bpm, moyenné, puis on regarde le delta
+    const effRatio = (arr) => {
+      const valid = arr.filter(a => a.average_heartrate > 0);
+      if (!valid.length) return null;
+      const avgSpeedKmh = valid.reduce((s, a) => s + a.average_speed * 3.6, 0) / valid.length;
+      const avgHr = valid.reduce((s, a) => s + a.average_heartrate, 0) / valid.length;
+      return { speed: avgSpeedKmh, hr: avgHr, efficiency: avgSpeedKmh / avgHr };
+    };
+
+    const oldEff = effRatio(older);
+    const newEff = effRatio(recent);
+
+    if (!oldEff || !newEff) continue;
+
+    const deltaPct = ((newEff.efficiency - oldEff.efficiency) / oldEff.efficiency) * 100;
+    const speedDelta = newEff.speed - oldEff.speed;
+    const hrDelta = newEff.hr - oldEff.hr;
+
+    let cls = 'neutral', icon = '→', verdict = 'Stable';
+    if (deltaPct > 3) { cls = 'up'; icon = '↑'; verdict = 'Progression'; }
+    else if (deltaPct < -3) { cls = 'down'; icon = '↓'; verdict = 'Régression'; }
+
+    html += `
+      <div class="insight ${cls}">
+        <div class="icon">${icon}</div>
+        <div class="text">
+          <strong>${groupLabels[key]} — ${verdict}</strong>
+          <div class="detail">
+            Efficacité (vitesse/FC) : ${oldEff.efficiency.toFixed(3)} → ${newEff.efficiency.toFixed(3)} (${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(1)}%).
+            Vitesse moyenne ${speedDelta >= 0 ? '+' : ''}${speedDelta.toFixed(1)} km/h, FC moyenne ${hrDelta >= 0 ? '+' : ''}${hrDelta.toFixed(0)} bpm
+            (comparé sur ${older.length} sorties anciennes vs ${recent.length} récentes).
+          </div>
+        </div>
+      </div>`;
+  }
+
+  if (!anyInsight) {
+    html += `<div class="insight neutral"><div class="icon">i</div><div class="text">Pas assez de sorties dans une même catégorie de terrain pour comparer (minimum 4 par catégorie).</div></div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+// --- Chart ---
+const chartInstances = {};
+function renderChart(canvasId, activities) {
+  const sorted = [...activities].sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+
+  if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
+
+  chartInstances[canvasId] = new Chart(ctx, {
+    data: {
+      labels: sorted.map(a => fmtDate(a.start_date)),
+      datasets: [
+        {
+          type: 'line',
+          label: 'Vitesse moy. (km/h)',
+          data: sorted.map(a => (a.average_speed * 3.6).toFixed(1)),
+          borderColor: '#b85c38',
+          backgroundColor: '#b85c38',
+          yAxisID: 'y',
+          tension: 0.3,
+        },
+        {
+          type: 'line',
+          label: 'FC moy. (bpm)',
+          data: sorted.map(a => a.average_heartrate ? Math.round(a.average_heartrate) : null),
+          borderColor: '#5c7a4f',
+          backgroundColor: '#5c7a4f',
+          yAxisID: 'y1',
+          tension: 0.3,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        y: { type: 'linear', position: 'left', title: { display: true, text: 'km/h' } },
+        y1: { type: 'linear', position: 'right', title: { display: true, text: 'bpm' }, grid: { drawOnChartArea: false } },
+      },
+      plugins: { legend: { position: 'bottom' } },
+    },
+  });
+}
+
+init();
+</script>
+</body>
+</html>
