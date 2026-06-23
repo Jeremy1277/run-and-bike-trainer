@@ -80,19 +80,22 @@ const RBTCoach = {
           <div class="timeline-meta" style="margin: 8px 0 16px;">
             <span class="timeline-badge">${terrainLabel[seance.type_terrain] || seance.type_terrain}</span>
             <span class="timeline-badge">${seance.duree_min} min</span>
+            ${seance.distance_cible_km ? `<span class="timeline-badge">${seance.distance_cible_km} km</span>` : ''}
             <span class="timeline-badge">${RBT.escapeHtml(seance.zone_fc_cible)}</span>
           </div>
           <p style="font-size: 14px; color: var(--ink-soft); line-height: 1.6; margin-bottom: 18px;">${RBT.escapeHtml(seance.explication || seance.objectif)}</p>
           ${seance.blocs && seance.blocs.length ? `
             <div style="border-top: 1px solid var(--line); padding-top: 14px;">
               ${seance.blocs.map((b) => `
-                <div style="display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px;">
+                <div style="display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px;">
                   <div style="flex: 1;">
                     <div style="font-weight: 600;">${RBT.escapeHtml(b.phase)}</div>
                     <div style="color: var(--ink-soft); margin-top: 2px;">${RBT.escapeHtml(b.description)}</div>
+                    ${b.rythme_cible ? `<div class="mono" style="color: var(--moss); margin-top: 4px; font-size: 12px;">${RBT.escapeHtml(b.rythme_cible)}</div>` : ''}
                   </div>
                   <div class="mono" style="text-align: right; flex-shrink: 0; color: var(--ink-soft);">
                     <div>${b.duree_min} min</div>
+                    ${b.distance_km ? `<div>${b.distance_km} km</div>` : ''}
                     <div style="color: var(--signal);">${RBT.escapeHtml(b.zone_fc)}</div>
                   </div>
                 </div>
