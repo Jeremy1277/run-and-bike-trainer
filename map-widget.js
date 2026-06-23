@@ -7,7 +7,7 @@
    OpenRouteService (gratuite, openrouteservice.org).
    =========================================================== */
 
-const ORS_API_KEY = 'COLLE_TA_CLE_OPENROUTESERVICE_ICI';
+const ORS_API_KEY = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImMyN2M1MmQwN2ZkYjQ5OGNiZWFhNWY3ZDEzNGVlMmY4IiwiaCI6Im11cm11cjY0In0=';
 
 const RBTMap = {
   _map: null,
