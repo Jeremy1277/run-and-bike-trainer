@@ -4,7 +4,7 @@
    (restreinte au domaine jeremy1277.github.io dans la console Google Cloud).
    =========================================================== */
 
-const GOOGLE_MAPS_API_KEY = AIzaSyCz_vkQaCbEz2kgvwHB9c9UtaRPu0G011g;
+const GOOGLE_MAPS_API_KEY = 'AIzaSyCz_vkQaCbEz2kgvwHB9c9UtaRPu0G011g';
 
 const RBTMap = {
   _map: null,
@@ -46,7 +46,7 @@ const RBTMap = {
     if (RBTMap._scriptLoading) return RBTMap._scriptLoading;
 
     RBTMap._scriptLoading = new Promise((resolve, reject) => {
-      if (!GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY.includes(AIzaSyCz_vkQaCbEz2kgvwHB9c9UtaRPu0G011g)) {
+     if (!GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY.includes('COLLE_TA_CLE')) {
         reject(new Error('Clé Google Maps non configurée. Remplace GOOGLE_MAPS_API_KEY dans map-widget.js.'));
         return;
       }
