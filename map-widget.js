@@ -1,20 +1,21 @@
 /* ===========================================================
    Carte des lieux d'entraînement — itinéraire réel avec D+ calculé
-   Combine Geocoding + Directions + Elevation API pour proposer une
-   boucle dont la distance et le dénivelé correspondent à la séance
-   choisie, plutôt qu'une simple recherche de lieux.
-   IMPORTANT : remplace GOOGLE_MAPS_API_KEY ci-dessous par ta clé
-   (restreinte au domaine jeremy1277.github.io dans la console Google Cloud).
+   Stack 100% gratuite : Leaflet (carte) + tuiles CyclOSM (fond de
+   carte lisible vélo, basé OpenStreetMap) + OpenRouteService
+   (calcul d'itinéraire réel + dénivelé en une seule requête).
+   IMPORTANT : remplace ORS_API_KEY ci-dessous par ta clé
+   OpenRouteService (gratuite, openrouteservice.org).
    =========================================================== */
 
-const GOOGLE_MAPS_API_KEY = 'AIzaSyCz_vkQaCbEz2kgvwHB9c9UtaRPu0G011g';
+const ORS_API_KEY = 'COLLE_TA_CLE_OPENROUTESERVICE_ICI';
 
 const RBTMap = {
   _map: null,
-  _routePolylines: [],
-  _scriptLoaded: false,
-  _scriptLoading: null,
+  _routeLayers: [],
+  _leafletLoaded: false,
+  _leafletLoading: null,
   _activeSeance: null,
+  _geocodeCache: {},
 
   renderPanel(sport) {
     return `
@@ -40,26 +41,39 @@ const RBTMap = {
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') RBTMap._search(sport); });
   },
 
-  async _loadGoogleMapsScript() {
-    if (RBTMap._scriptLoaded) return;
-    if (RBTMap._scriptLoading) return RBTMap._scriptLoading;
+  async _loadLeaflet() {
+    if (RBTMap._leafletLoaded) return;
+    if (RBTMap._leafletLoading) return RBTMap._leafletLoading;
 
-    RBTMap._scriptLoading = new Promise((resolve, reject) => {
-      if (!GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY.includes('COLLE_TA_CLE')) {
-        reject(new Error('Clé Google Maps non configurée. Remplace GOOGLE_MAPS_API_KEY dans map-widget.js.'));
-        return;
-      }
+    RBTMap._leafletLoading = new Promise((resolve, reject) => {
+      const css = document.createElement('link');
+      css.rel = 'stylesheet';
+      css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+      document.head.appendChild(css);
+
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places,geometry&callback=__rbtGoogleMapsReady`;
-      window.__rbtGoogleMapsReady = () => { RBTMap._scriptLoaded = true; resolve(); };
-      script.onerror = () => reject(new Error('Impossible de charger Google Maps.'));
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+      script.onload = () => { RBTMap._leafletLoaded = true; resolve(); };
+      script.onerror = () => reject(new Error('Impossible de charger Leaflet.'));
       document.head.appendChild(script);
     });
 
-    return RBTMap._scriptLoading;
+    return RBTMap._leafletLoading;
   },
 
-  // Calcule un point à une distance (km) et un cap (degrés) donnés depuis l'origine.
+  async _geocode(location) {
+    if (RBTMap._geocodeCache[location]) return RBTMap._geocodeCache[location];
+
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}&limit=1`;
+    const res = await fetch(url, { headers: { 'Accept-Language': 'fr' } });
+    const data = await res.json();
+    if (!data || data.length === 0) throw new Error('Lieu introuvable. Précise la ville ou l\'adresse.');
+
+    const point = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    RBTMap._geocodeCache[location] = point;
+    return point;
+  },
+
   _destinationPoint(lat, lng, distanceKm, bearingDeg) {
     const R = 6371;
     const bearing = (bearingDeg * Math.PI) / 180;
@@ -70,46 +84,52 @@ const RBTMap = {
     return { lat: (lat2 * 180) / Math.PI, lng: (lng2 * 180) / Math.PI };
   },
 
-  // Calcule le D+ total d'un tracé en sommant les montées entre points d'élévation échantillonnés.
-  async _computeElevationGain(path) {
-    return new Promise((resolve, reject) => {
-      const elevator = new google.maps.ElevationService();
-      elevator.getElevationAlongPath({ path, samples: 40 }, (results, status) => {
-        if (status !== 'OK' || !results) { reject(new Error('Élévation indisponible')); return; }
-        let gain = 0;
-        for (let i = 1; i < results.length; i++) {
-          const delta = results[i].elevation - results[i - 1].elevation;
-          if (delta > 0) gain += delta;
-        }
-        resolve(Math.round(gain));
-      });
-    });
-  },
+  async _computeRouteLoop(origin, distanceKm, bearingDeg, sport) {
+    const waypoint = RBTMap._destinationPoint(origin.lat, origin.lng, distanceKm / 2, bearingDeg);
+    const profile = sport === 'course' ? 'foot-walking' : 'cycling-regular';
 
-  async _computeRouteLoop(directionsService, origin, distanceKm, bearingDeg) {
-    // Une boucle approximative : départ -> point à mi-distance dans une direction -> retour.
-    // DirectionsService recalcule le vrai tracé routier entre ces points.
-    const waypoint = RBTMap._destinationPoint(origin.lat(), origin.lng(), distanceKm / 2, bearingDeg);
+    const body = {
+      coordinates: [
+        [origin.lng, origin.lat],
+        [waypoint.lng, waypoint.lat],
+        [origin.lng, origin.lat],
+      ],
+      elevation: true,
+    };
 
-    const result = await new Promise((resolve, reject) => {
-      directionsService.route({
-        origin,
-        destination: origin,
-        waypoints: [{ location: waypoint, stopover: true }],
-        travelMode: google.maps.TravelMode.BICYCLING,
-        optimizeWaypoints: false,
-      }, (res, status) => {
-        if (status === 'OK') resolve(res);
-        else reject(new Error(`Itinéraire impossible (${status})`));
-      });
+    const res = await fetch(`https://api.openrouteservice.org/v2/directions/${profile}/geojson`, {
+      method: 'POST',
+      headers: {
+        Authorization: ORS_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
     });
 
-    const route = result.routes[0];
-    const path = route.overview_path;
-    const actualDistanceKm = route.legs.reduce((s, leg) => s + leg.distance.value, 0) / 1000;
-    const elevationGain = await RBTMap._computeElevationGain(path).catch(() => null);
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => null);
+      throw new Error(errBody?.error?.message || `Itinéraire impossible (${res.status})`);
+    }
 
-    return { result, route, path, actualDistanceKm, elevationGain, bearingDeg };
+    const data = await res.json();
+    const feature = data.features[0];
+    const coords = feature.geometry.coordinates;
+    const summary = feature.properties.summary;
+
+    let elevationGain = 0;
+    for (let i = 1; i < coords.length; i++) {
+      const delta = coords[i][2] - coords[i - 1][2];
+      if (delta > 0) elevationGain += delta;
+    }
+
+    const path = coords.map((c) => [c[1], c[0]]);
+
+    return {
+      path,
+      actualDistanceKm: summary.distance / 1000,
+      elevationGain: Math.round(elevationGain),
+      bearingDeg,
+    };
   },
 
   async _search(sport) {
@@ -124,14 +144,20 @@ const RBTMap = {
       resultsEl.innerHTML = `<div class="map-result-item"><span class="map-result-name">Renseigne d'abord un point de départ.</span></div>`;
       return;
     }
+    if (!ORS_API_KEY || ORS_API_KEY.includes('COLLE_TA_CLE')) {
+      resultsEl.innerHTML = `<div class="map-result-item"><span class="map-result-name">Clé OpenRouteService non configurée. Remplace ORS_API_KEY dans map-widget.js.</span></div>`;
+      return;
+    }
 
-    // Distance cible : celle saisie manuellement, ou déduite de la séance active (durée -> distance approx),
-    // ou une valeur par défaut raisonnable.
     let targetDistanceKm = parseFloat(distanceInput.value);
     if (!targetDistanceKm || targetDistanceKm <= 0) {
       if (RBTMap._activeSeance) {
-        const speedAssumed = sport === 'course' ? 9 : 20; // km/h, hypothèse prudente
-        targetDistanceKm = Math.round((RBTMap._activeSeance.duree_min / 60) * speedAssumed);
+        if (RBTMap._activeSeance.distance_cible_km) {
+          targetDistanceKm = RBTMap._activeSeance.distance_cible_km;
+        } else {
+          const speedAssumed = sport === 'course' ? 9 : 20;
+          targetDistanceKm = Math.round((RBTMap._activeSeance.duree_min / 60) * speedAssumed);
+        }
       } else {
         targetDistanceKm = sport === 'course' ? 8 : 30;
       }
@@ -146,52 +172,44 @@ const RBTMap = {
     resultsEl.innerHTML = `<div class="map-result-item"><span class="map-result-name">Recherche d'itinéraires réels autour de ${RBT.escapeHtml(location)}...</span></div>`;
 
     try {
-      await RBTMap._loadGoogleMapsScript();
+      await RBTMap._loadLeaflet();
+      const origin = await RBTMap._geocode(location);
 
-      const geocoder = new google.maps.Geocoder();
-      const geoResult = await new Promise((resolve, reject) => {
-        geocoder.geocode({ address: location }, (results, status) => {
-          if (status === 'OK' && results[0]) resolve(results[0]);
-          else reject(new Error('Lieu introuvable. Précise la ville ou l\'adresse.'));
-        });
-      });
-
-      const origin = geoResult.geometry.location;
       mapCanvas.style.display = 'block';
 
       if (!RBTMap._map) {
-        RBTMap._map = new google.maps.Map(mapCanvas, { center: origin, zoom: 12, styles: RBTMap._darkStyles() });
+        RBTMap._map = L.map(mapCanvas, { center: [origin.lat, origin.lng], zoom: 12 });
+        L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors, CyclOSM',
+          maxZoom: 20,
+        }).addTo(RBTMap._map);
       } else {
-        RBTMap._map.setCenter(origin);
+        RBTMap._map.setView([origin.lat, origin.lng], 12);
       }
 
-      RBTMap._routePolylines.forEach((p) => p.setMap(null));
-      RBTMap._routePolylines = [];
+      RBTMap._routeLayers.forEach((l) => RBTMap._map.removeLayer(l));
+      RBTMap._routeLayers = [];
 
-      const directionsService = new google.maps.DirectionsService();
-      const bearings = [0, 60, 120, 180, 240, 300];
+      const bearings = [0, 90, 180, 270];
       const candidates = [];
-
       for (const bearing of bearings) {
         try {
-          const candidate = await RBTMap._computeRouteLoop(directionsService, origin, targetDistanceKm, bearing);
+          const candidate = await RBTMap._computeRouteLoop(origin, targetDistanceKm, bearing, sport);
           candidates.push(candidate);
         } catch (e) {
-          // direction sans route praticable, on l'ignore
+          // direction sans itinéraire praticable, on l'ignore et on essaie les autres
         }
       }
 
       if (candidates.length === 0) {
-        resultsEl.innerHTML = `<div class="map-result-item"><span class="map-result-name">Impossible de calculer un itinéraire depuis ce point. Essaie un lieu plus précis.</span></div>`;
+        resultsEl.innerHTML = `<div class="map-result-item"><span class="map-result-name">Impossible de calculer un itinéraire depuis ce point. Essaie un lieu plus précis ou une distance plus courte.</span></div>`;
         btn.disabled = false;
         btn.textContent = 'Générer un parcours';
         return;
       }
 
-      // Trie les candidats : priorité à ceux dont le D+ colle à la cible (si une séance est active),
-      // sinon priorité à ceux dont la distance colle le mieux à la distance demandée.
       candidates.sort((a, b) => {
-        if (targetElevation !== null && a.elevationGain !== null && b.elevationGain !== null) {
+        if (targetElevation !== null) {
           return Math.abs(a.elevationGain - targetElevation) - Math.abs(b.elevationGain - targetElevation);
         }
         return Math.abs(a.actualDistanceKm - targetDistanceKm) - Math.abs(b.actualDistanceKm - targetDistanceKm);
@@ -201,25 +219,21 @@ const RBTMap = {
       const colors = ['#ff6b35', '#4fd1a5', '#f2b84b'];
 
       top3.forEach((c, i) => {
-        const polyline = new google.maps.Polyline({
-          path: c.path,
-          strokeColor: colors[i],
-          strokeOpacity: i === 0 ? 0.95 : 0.5,
-          strokeWeight: i === 0 ? 5 : 3,
-        });
-        polyline.setMap(RBTMap._map);
-        RBTMap._routePolylines.push(polyline);
+        const polyline = L.polyline(c.path, {
+          color: colors[i],
+          weight: i === 0 ? 5 : 3,
+          opacity: i === 0 ? 0.95 : 0.5,
+        }).addTo(RBTMap._map);
+        RBTMap._routeLayers.push(polyline);
       });
 
-      const bounds = new google.maps.LatLngBounds();
-      top3[0].path.forEach((p) => bounds.extend(p));
-      RBTMap._map.fitBounds(bounds);
+      RBTMap._map.fitBounds(RBTMap._routeLayers[0].getBounds(), { padding: [20, 20] });
 
       resultsEl.innerHTML = top3.map((c, i) => `
         <div class="map-result-item" style="border-left: 3px solid ${colors[i]};">
           <div>
             <div class="map-result-name">Boucle ${i + 1} ${i === 0 ? '— recommandée' : ''}</div>
-            <div class="map-result-meta">${c.actualDistanceKm.toFixed(1)} km${c.elevationGain !== null ? ` · ${c.elevationGain} m D+` : ' · D+ indisponible'}</div>
+            <div class="map-result-meta">${c.actualDistanceKm.toFixed(1)} km · ${c.elevationGain} m D+</div>
           </div>
         </div>
       `).join('') + (targetElevation ? `<div class="map-result-meta" style="margin-top:8px;">Cible séance : ~${targetDistanceKm} km, ~${targetElevation} m D+ (terrain ${RBTMap._activeSeance.type_terrain})</div>` : '');
@@ -229,17 +243,5 @@ const RBTMap = {
 
     btn.disabled = false;
     btn.textContent = 'Générer un parcours';
-  },
-
-  _darkStyles() {
-    return [
-      { elementType: 'geometry', stylers: [{ color: '#1c2024' }] },
-      { elementType: 'labels.text.stroke', stylers: [{ color: '#1c2024' }] },
-      { elementType: 'labels.text.fill', stylers: [{ color: '#9aa1a9' }] },
-      { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2e343b' }] },
-      { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#14171a' }] },
-      { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#20242a' }] },
-      { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#181b1e' }] },
-    ];
   },
 };
