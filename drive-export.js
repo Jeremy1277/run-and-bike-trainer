@@ -7,7 +7,7 @@
    par cette appli — jamais le reste de ton Drive).
    =========================================================== */
 
-const GOOGLE_OAUTH_CLIENT_ID = 'COLLE_TON_CLIENT_ID_OAUTH_ICI';
+const GOOGLE_OAUTH_CLIENT_ID = 271951908415-takqk90ctg8rt4tsodp5n392empa7tfq.apps.googleusercontent.com;
 
 const RBTDrive = {
   _tokenClient: null,
