@@ -3,262 +3,38 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Run & Bike Trainer</title>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
-
-  :root {
-    --bg: #f4f1ea;
-    --bg-card: #ffffff;
-    --ink: #2b2622;
-    --ink-soft: #6b6258;
-    --line: #ddd5c7;
-    --clay: #b85c38;
-    --clay-dark: #8f4427;
-    --moss: #5c7a4f;
-    --moss-dark: #3f5c38;
-    --amber: #d99a3d;
-    --red: #b8453a;
-    --shadow: rgba(43, 38, 34, 0.08);
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    background: var(--bg);
-    color: var(--ink);
-    font-family: 'Space Grotesk', sans-serif;
-    line-height: 1.5;
-    padding-bottom: 60px;
-  }
-
-  .mono { font-family: 'DM Mono', monospace; }
-
-  header {
-    padding: 32px 24px 24px;
-    max-width: 1100px;
-    margin: 0 auto;
-    border-bottom: 1px solid var(--line);
-  }
-
-  header .eyebrow {
-    font-family: 'DM Mono', monospace;
-    font-size: 12px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--clay-dark);
-    margin-bottom: 8px;
-  }
-
-  header h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.01em; }
-  header .sub { color: var(--ink-soft); font-size: 15px; margin-top: 6px; }
-
-  .status-bar {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-top: 20px;
-    font-family: 'DM Mono', monospace;
-    font-size: 13px;
-    flex-wrap: wrap;
-  }
-
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--moss); flex-shrink: 0; }
-  .dot.off { background: var(--ink-soft); opacity: 0.4; }
-
-  button {
-    font-family: 'Space Grotesk', sans-serif;
-    font-weight: 600;
-    font-size: 14px;
-    padding: 10px 18px;
-    border-radius: 6px;
-    border: none;
-    cursor: pointer;
-    transition: transform 0.1s ease, opacity 0.15s ease;
-  }
-  button:active { transform: scale(0.97); }
-  button:disabled { opacity: 0.5; cursor: default; }
-
-  .btn-primary { background: var(--clay); color: white; }
-  .btn-primary:hover:not(:disabled) { background: var(--clay-dark); }
-  .btn-ghost { background: transparent; color: var(--ink-soft); border: 1px solid var(--line); }
-  .btn-ghost:hover { border-color: var(--ink-soft); color: var(--ink); }
-  .btn-small { padding: 5px 10px; font-size: 12px; border-radius: 5px; }
-  .btn-danger-ghost { background: transparent; color: var(--red); border: 1px solid rgba(184, 69, 58, 0.3); }
-  .btn-danger-ghost:hover { background: rgba(184, 69, 58, 0.08); }
-
-  main { max-width: 1100px; margin: 0 auto; padding: 24px; }
-
-  .empty-state { text-align: center; padding: 80px 24px; color: var(--ink-soft); }
-  .empty-state h2 { color: var(--ink); font-size: 22px; margin-bottom: 8px; }
-
-  .tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--line); }
-
-  .tab {
-    font-family: 'DM Mono', monospace;
-    font-size: 13px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    padding: 10px 16px;
-    cursor: pointer;
-    color: var(--ink-soft);
-    border-bottom: 2px solid transparent;
-    background: none;
-    border-radius: 0;
-  }
-  .tab.active { color: var(--clay-dark); border-bottom-color: var(--clay); }
-  .tab:hover:not(.active) { color: var(--ink); }
-
-  .section { display: none; }
-  .section.active { display: block; }
-
-  .stat-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 12px;
-    margin-bottom: 28px;
-  }
-
-  .stat-card { background: var(--bg-card); border-radius: 10px; padding: 16px 18px; box-shadow: 0 1px 3px var(--shadow); }
-  .stat-card .label {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--ink-soft);
-    margin-bottom: 6px;
-  }
-  .stat-card .value { font-size: 26px; font-weight: 700; line-height: 1; }
-  .stat-card .value .unit { font-size: 14px; font-weight: 500; color: var(--ink-soft); margin-left: 3px; }
-
-  .panel { background: var(--bg-card); border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 1px 3px var(--shadow); }
-  .panel h3 { font-size: 17px; font-weight: 600; margin-bottom: 4px; }
-  .panel .panel-sub { color: var(--ink-soft); font-size: 13px; margin-bottom: 18px; }
-  .panel-head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-
-  .activity-row {
-    display: grid;
-    grid-template-columns: 84px 1fr 76px 70px 70px 64px 70px 70px;
-    gap: 10px;
-    align-items: center;
-    padding: 12px 0;
-    border-bottom: 1px solid var(--line);
-    font-size: 14px;
-  }
-  .activity-row:last-child { border-bottom: none; }
-  .activity-row.excluded { opacity: 0.4; }
-  .activity-row .date { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--ink-soft); }
-  .activity-row .name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .activity-row .metric { font-family: 'DM Mono', monospace; font-size: 13px; text-align: right; color: var(--ink-soft); }
-  .activity-row .metric strong { color: var(--ink); font-weight: 500; }
-  .activity-row .source {
-    font-family: 'DM Mono', monospace;
-    font-size: 10px;
-    text-transform: uppercase;
-    color: var(--ink-soft);
-    text-align: center;
-    padding: 2px 4px;
-    border-radius: 4px;
-    background: var(--bg);
-  }
-  .activity-row .action { text-align: right; }
-
-  .row-head {
-    display: grid;
-    grid-template-columns: 84px 1fr 76px 70px 70px 64px 70px 70px;
-    gap: 10px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--ink);
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--ink-soft);
-  }
-  .row-head .metric { text-align: right; }
-  .row-head .action { text-align: right; }
-
-  .insight { display: flex; gap: 14px; padding: 16px; border-radius: 10px; margin-bottom: 12px; align-items: flex-start; }
-  .insight.up { background: rgba(92, 122, 79, 0.1); }
-  .insight.down { background: rgba(184, 69, 58, 0.1); }
-  .insight.neutral { background: var(--bg); }
-  .insight .icon {
-    font-family: 'DM Mono', monospace;
-    font-size: 20px;
-    font-weight: 700;
-    width: 28px;
-    text-align: center;
-    flex-shrink: 0;
-  }
-  .insight.up .icon { color: var(--moss-dark); }
-  .insight.down .icon { color: var(--red); }
-  .insight.neutral .icon { color: var(--ink-soft); }
-  .insight .text { font-size: 14px; }
-  .insight .text strong { font-weight: 600; }
-  .insight .text .detail { color: var(--ink-soft); font-size: 13px; margin-top: 2px; }
-  .insight .tag {
-    display: inline-block;
-    font-family: 'DM Mono', monospace;
-    font-size: 10px;
-    text-transform: uppercase;
-    padding: 1px 6px;
-    border-radius: 4px;
-    margin-left: 6px;
-    background: var(--amber);
-    color: white;
-    vertical-align: middle;
-  }
-
-  canvas { width: 100% !important; }
-
-  .loading-msg { text-align: center; padding: 60px; color: var(--ink-soft); font-family: 'DM Mono', monospace; font-size: 13px; }
-
-  .coach-panel { background: linear-gradient(135deg, #fff 0%, #faf6ee 100%); border: 1px solid var(--line); }
-  .coach-text { font-size: 15px; line-height: 1.7; white-space: pre-wrap; }
-  .coach-text strong { font-weight: 600; }
-  .coach-meta { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink-soft); margin-top: 16px; }
-
-  @media (max-width: 720px) {
-    .activity-row, .row-head { grid-template-columns: 64px 1fr 56px; }
-    .activity-row > *:nth-child(3), .activity-row > *:nth-child(4),
-    .activity-row > *:nth-child(5), .activity-row > *:nth-child(6),
-    .row-head > *:nth-child(3), .row-head > *:nth-child(4),
-    .row-head > *:nth-child(5), .row-head > *:nth-child(6) { display: none; }
-  }
-</style>
+<title>Run &amp; Bike Trainer</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<header>
-  <div class="eyebrow">Run &amp; Bike Trainer</div>
-  <h1>Tableau de bord</h1>
-  <div class="sub">Vélo gravel &amp; course à pied — analyse de progression</div>
-  <div class="status-bar">
-    <div class="dot off" id="statusDot"></div>
-    <span id="statusText">Connexion...</span>
-    <button class="btn-ghost" id="syncBtn" style="margin-left: auto;">Sync</button>
-    <button class="btn-primary" id="connectBtn" style="display:none;">Se connecter à Strava</button>
+<div id="nav"></div>
+
+<div class="relief-hero">
+  <div id="relief-svg-container"></div>
+  <div class="relief-content">
+    <div class="relief-eyebrow">Run &amp; Bike Trainer</div>
+    <div class="relief-title">Bord de piste</div>
+    <div class="relief-sub">Vue d'ensemble — vélo gravel &amp; course à pied</div>
+    <div class="status-bar">
+      <div class="dot off" id="statusDot"></div>
+      <span id="statusText">Connexion...</span>
+      <button class="btn-ghost" id="syncBtn" style="margin-left: auto;">Sync</button>
+      <button class="btn-signal" id="connectBtn" style="display:none;">Se connecter à Strava</button>
+    </div>
   </div>
-</header>
+</div>
 
 <main>
   <div id="emptyState" class="empty-state" style="display:none;"></div>
-  <div id="loadingState" class="loading-msg">Chargement des activités...</div>
-
-  <div id="content" style="display:none;">
-    <div class="tabs">
-      <button class="tab active" data-tab="velo">Vélo</button>
-      <button class="tab" data-tab="course">Course à pied</button>
-    </div>
-
-    <div class="section active" id="section-velo"></div>
-    <div class="section" id="section-course"></div>
-  </div>
+  <div id="loadingState" class="loading-msg">Chargement...</div>
+  <div id="content" style="display:none;"></div>
 </main>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="shared.js"></script>
 <script>
-const API_BASE = 'https://run-and-bike-trainer-api.onrender.com';
+document.getElementById('nav').outerHTML = RBT.renderNav('home');
+document.getElementById('relief-svg-container').outerHTML = RBT.renderReliefSvg();
 
 const els = {
   statusDot: document.getElementById('statusDot'),
@@ -268,45 +44,13 @@ const els = {
   emptyState: document.getElementById('emptyState'),
   loadingState: document.getElementById('loadingState'),
   content: document.getElementById('content'),
-  sectionVelo: document.getElementById('section-velo'),
-  sectionCourse: document.getElementById('section-course'),
 };
-
-let allActivities = [];
-let excludedIds = [];
-let coachAdvice = null;
-const chartInstances = {};
-
-function fmtDate(iso) {
-  const d = new Date(iso);
-  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-}
-function fmtMonthLabel(iso) {
-  const d = new Date(iso);
-  return d.toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' });
-}
-function fmtKm(meters) { return (meters / 1000).toFixed(1); }
-function fmtSpeed(mps) { return mps ? (mps * 3.6).toFixed(1) : '—'; }
-function ratioDplusKm(act) {
-  const km = act.distance / 1000;
-  return km > 0 ? act.total_elevation_gain / km : 0;
-}
-function guessSource(act) {
-  const ext = (act.external_id || '').toLowerCase();
-  if (ext.includes('garmin')) return 'Garmin';
-  if (ext.includes('wahoo')) return 'Wahoo';
-  if (ext.includes('igpsport') || ext.includes('igs')) return 'iGPSport';
-  if (act.upload_id_str || act.upload_id) return 'Import';
-  if (act.manual) return 'Manuel';
-  return 'Strava';
-}
 
 async function init() {
   try {
-    const statusRes = await fetch(`${API_BASE}/api/status`);
-    const status = await statusRes.json();
+    const connected = await RBT.loadAll();
 
-    if (!status.connected) {
+    if (!connected) {
       els.statusText.textContent = 'Non connecté';
       els.connectBtn.style.display = 'inline-block';
       els.loadingState.style.display = 'none';
@@ -316,46 +60,12 @@ async function init() {
     }
 
     els.statusDot.classList.remove('off');
-    els.statusText.textContent = `Connecté — ${status.athlete.firstname} ${status.athlete.lastname}`;
-
-    await loadAll();
+    els.statusText.textContent = `Connecté — ${RBT.state.athlete.firstname} ${RBT.state.athlete.lastname}`;
+    render();
   } catch (err) {
     els.statusText.textContent = 'Erreur de connexion au serveur';
     els.loadingState.textContent = 'Le serveur met parfois 1 minute à se réveiller (free tier). Réessaie dans un instant avec Sync.';
   }
-}
-
-async function loadAll() {
-  els.loadingState.style.display = 'block';
-  els.content.style.display = 'none';
-
-  const [actRes, excludedRes, coachRes] = await Promise.all([
-    fetch(`${API_BASE}/api/activities`),
-    fetch(`${API_BASE}/api/excluded`).catch(() => null),
-    fetch(`${API_BASE}/api/coach`).catch(() => null),
-  ]);
-
-  const data = await actRes.json();
-  allActivities = data.activities || [];
-
-  if (excludedRes) {
-    const excludedData = await excludedRes.json();
-    excludedIds = excludedData.ids || [];
-  }
-  if (coachRes) {
-    coachAdvice = await coachRes.json();
-  }
-
-  els.loadingState.style.display = 'none';
-
-  if (allActivities.length === 0) {
-    els.emptyState.style.display = 'block';
-    els.emptyState.innerHTML = '<h2>Aucune activité</h2><p>Clique sur Sync pour récupérer tes données Strava.</p>';
-    return;
-  }
-
-  els.content.style.display = 'block';
-  render();
 }
 
 els.connectBtn.addEventListener('click', () => {
@@ -366,8 +76,9 @@ els.syncBtn.addEventListener('click', async () => {
   els.syncBtn.disabled = true;
   els.syncBtn.textContent = 'Sync...';
   try {
-    await fetch(`${API_BASE}/api/sync`);
-    await loadAll();
+    await RBT.sync();
+    await RBT.loadAll();
+    render();
   } catch (err) {
     alert('Erreur de synchronisation. Le serveur met parfois 1 minute à se réveiller, réessaie.');
   }
@@ -375,354 +86,51 @@ els.syncBtn.addEventListener('click', async () => {
   els.syncBtn.textContent = 'Sync';
 });
 
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-    tab.classList.add('active');
-    document.getElementById(`section-${tab.dataset.tab}`).classList.add('active');
-  });
-});
-
-async function toggleExclude(id, exclude) {
-  const action = exclude ? 'exclude' : 'include';
-  await fetch(`${API_BASE}/api/activities/${id}/${action}`, { method: 'POST' });
-  if (exclude) {
-    if (!excludedIds.includes(id)) excludedIds.push(id);
-  } else {
-    excludedIds = excludedIds.filter(x => x !== id);
-  }
-  render();
-}
-window.toggleExclude = toggleExclude;
-
-async function regenerateCoach() {
-  const btn = document.getElementById('coachRegenBtn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Analyse en cours...'; }
-  try {
-    const res = await fetch(`${API_BASE}/api/coach/generate`, { method: 'POST' });
-    const data = await res.json();
-    if (data.error) {
-      alert(data.message || 'Le coach IA n\'est pas configuré côté serveur (clé API manquante).');
-    } else {
-      coachAdvice = data;
-      render();
-    }
-  } catch (err) {
-    alert('Erreur lors de la génération des conseils. Réessaie dans un instant.');
-  }
-  if (btn) { btn.disabled = false; btn.textContent = 'Régénérer les conseils'; }
-}
-window.regenerateCoach = regenerateCoach;
-
 function render() {
-  const rides = allActivities.filter(a => a.type === 'Ride' || a.sport_type === 'Ride' || a.sport_type === 'GravelRide')
-    .sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
-  const runs = allActivities.filter(a => a.type === 'Run' || a.sport_type === 'Run')
-    .sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
+  els.loadingState.style.display = 'none';
 
-  els.sectionVelo.innerHTML = renderSport(rides, 'vélo', 'chart-velo', 'chart-km-velo');
-  els.sectionCourse.innerHTML = renderSport(runs, 'course', 'chart-course', 'chart-km-course');
-
-  if (rides.length > 0) {
-    renderSpeedHrChart('chart-velo', rides);
-    renderMonthlyKmChart('chart-km-velo', rides);
-  }
-  if (runs.length > 0) {
-    renderSpeedHrChart('chart-course', runs);
-    renderMonthlyKmChart('chart-km-course', runs);
-  }
-}
-
-function renderSport(activitiesAll, label, chartId, kmChartId) {
-  if (activitiesAll.length === 0) {
-    return `<div class="empty-state"><h2>Pas de sortie ${label}</h2><p>Rien à analyser encore.</p></div>`;
-  }
-
-  const activeActivities = activitiesAll.filter(a => !excludedIds.includes(a.id));
-  const totalKm = activeActivities.reduce((s, a) => s + a.distance, 0) / 1000;
-  const totalDplus = activeActivities.reduce((s, a) => s + a.total_elevation_gain, 0);
-  const totalTime = activeActivities.reduce((s, a) => s + a.moving_time, 0);
-  const withHr = activeActivities.filter(a => a.average_heartrate);
-  const avgHr = withHr.length ? withHr.reduce((s, a) => s + a.average_heartrate, 0) / withHr.length : null;
-  const excludedCount = activitiesAll.length - activeActivities.length;
-
-  return `
-    <div class="stat-grid">
-      <div class="stat-card"><div class="label">Sorties</div><div class="value">${activeActivities.length}</div></div>
-      <div class="stat-card"><div class="label">Distance totale</div><div class="value">${totalKm.toFixed(0)}<span class="unit">km</span></div></div>
-      <div class="stat-card"><div class="label">D+ total</div><div class="value">${Math.round(totalDplus)}<span class="unit">m</span></div></div>
-      <div class="stat-card"><div class="label">Temps total</div><div class="value">${(totalTime / 3600).toFixed(0)}<span class="unit">h</span></div></div>
-      ${avgHr ? `<div class="stat-card"><div class="label">FC moyenne</div><div class="value">${avgHr.toFixed(0)}<span class="unit">bpm</span></div></div>` : ''}
-    </div>
-
-    ${renderCoachPanel(label)}
-
-    ${renderInsights(activeActivities, label)}
-
-    <div class="panel">
-      <h3>Kilomètres par mois</h3>
-      <div class="panel-sub">Volume mensuel, sorties exclues non comptées</div>
-      <canvas id="${kmChartId}" height="80"></canvas>
-    </div>
-
-    <div class="panel">
-      <h3>Évolution dans le temps</h3>
-      <div class="panel-sub">Vitesse moyenne et FC moyenne, sortie par sortie</div>
-      <canvas id="${chartId}" height="90"></canvas>
-    </div>
-
-    <div class="panel">
-      <div class="panel-head-row">
-        <div>
-          <h3>Toutes les sorties</h3>
-          <div class="panel-sub">${activitiesAll.length} activité${activitiesAll.length > 1 ? 's' : ''}${excludedCount ? `, ${excludedCount} exclue${excludedCount > 1 ? 's' : ''} de l'analyse` : ''}</div>
-        </div>
-      </div>
-      <div class="row-head">
-        <div>Date</div><div>Sortie</div><div class="metric">Dist.</div><div class="metric">D+</div>
-        <div class="metric">Vit.</div><div class="metric">FC</div><div>Source</div><div class="action">Action</div>
-      </div>
-      ${activitiesAll.map(a => {
-        const isExcluded = excludedIds.includes(a.id);
-        return `
-        <div class="activity-row ${isExcluded ? 'excluded' : ''}">
-          <div class="date">${fmtDate(a.start_date)}</div>
-          <div class="name">${a.name}</div>
-          <div class="metric"><strong>${fmtKm(a.distance)}</strong> km</div>
-          <div class="metric"><strong>${Math.round(a.total_elevation_gain)}</strong> m</div>
-          <div class="metric"><strong>${fmtSpeed(a.average_speed)}</strong></div>
-          <div class="metric">${a.average_heartrate ? `<strong>${Math.round(a.average_heartrate)}</strong>` : '—'}</div>
-          <div class="source">${guessSource(a)}</div>
-          <div class="action">
-            ${isExcluded
-              ? `<button class="btn-ghost btn-small" onclick="toggleExclude(${a.id}, false)">Réinclure</button>`
-              : `<button class="btn-danger-ghost btn-small" onclick="toggleExclude(${a.id}, true)">Exclure</button>`}
-          </div>
-        </div>`;
-      }).join('')}
-    </div>
-  `;
-}
-
-function renderCoachPanel(label) {
-  if (!coachAdvice || !coachAdvice.text) {
-    return `
-      <div class="panel coach-panel">
-        <h3>Coach IA</h3>
-        <div class="panel-sub">Pas encore de recommandations générées.</div>
-        <button class="btn-primary" id="coachRegenBtn" onclick="regenerateCoach()">Générer mes conseils</button>
-      </div>`;
-  }
-
-  const generatedDate = new Date(coachAdvice.generated_at).toLocaleString('fr-FR', {
-    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
-  });
-
-  const escaped = coachAdvice.text
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-
-  return `
-    <div class="panel coach-panel">
-      <div class="panel-head-row">
-        <h3>Coach IA</h3>
-        <button class="btn-ghost btn-small" id="coachRegenBtn" onclick="regenerateCoach()">Régénérer les conseils</button>
-      </div>
-      <div class="coach-text">${escaped}</div>
-      <div class="coach-meta">Généré le ${generatedDate} — basé sur tes 10 dernières sorties</div>
-    </div>`;
-}
-
-function renderInsights(activities, label) {
-  const withData = activities.filter(a => a.average_heartrate && a.average_speed && a.distance > 1000);
-  if (withData.length < 2) {
-    return `<div class="panel"><h3>Progression</h3><div class="panel-sub">Pas encore assez de données comparables (besoin d'au moins 2 sorties avec FC enregistrée).</div></div>`;
-  }
-
-  const groups = { plat: [], vallonne: [], montagneux: [] };
-  withData.forEach(a => {
-    const ratio = ratioDplusKm(a);
-    if (ratio < 5) groups.plat.push(a);
-    else if (ratio < 15) groups.vallonne.push(a);
-    else groups.montagneux.push(a);
-  });
-
-  const groupLabels = { plat: 'Terrain plat (< 5 m/km)', vallonne: 'Vallonné (5-15 m/km)', montagneux: 'Montagneux (15+ m/km)' };
-
-  let html = `<div class="panel"><h3>Progression par type de terrain</h3><div class="panel-sub">Comparaison vitesse-à-FC-équivalente entre tes sorties les plus anciennes et les plus récentes de chaque groupe</div>`;
-
-  let anyInsight = false;
-
-  for (const key of ['plat', 'vallonne', 'montagneux']) {
-    const group = groups[key].sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
-    if (group.length < 2) continue;
-    anyInsight = true;
-
-    const isFragile = group.length < 4;
-    const half = Math.max(1, Math.floor(group.length / 2));
-    const older = group.slice(0, half);
-    const recent = group.slice(-half);
-
-    const effRatio = (arr) => {
-      const valid = arr.filter(a => a.average_heartrate > 0);
-      if (!valid.length) return null;
-      const avgSpeedKmh = valid.reduce((s, a) => s + a.average_speed * 3.6, 0) / valid.length;
-      const avgHr = valid.reduce((s, a) => s + a.average_heartrate, 0) / valid.length;
-      return { speed: avgSpeedKmh, hr: avgHr, efficiency: avgSpeedKmh / avgHr };
-    };
-
-    const oldEff = effRatio(older);
-    const newEff = effRatio(recent);
-    if (!oldEff || !newEff) continue;
-
-    const deltaPct = ((newEff.efficiency - oldEff.efficiency) / oldEff.efficiency) * 100;
-    const speedDelta = newEff.speed - oldEff.speed;
-    const hrDelta = newEff.hr - oldEff.hr;
-
-    let cls = 'neutral', icon = '→', verdict = 'Stable';
-    if (deltaPct > 3) { cls = 'up'; icon = '↑'; verdict = 'Progression'; }
-    else if (deltaPct < -3) { cls = 'down'; icon = '↓'; verdict = 'Régression'; }
-
-    html += `
-      <div class="insight ${cls}">
-        <div class="icon">${icon}</div>
-        <div class="text">
-          <strong>${groupLabels[key]} — ${verdict}</strong>
-          ${isFragile ? '<span class="tag">tendance fragile</span>' : ''}
-          <div class="detail">
-            Efficacité (vitesse/FC) : ${oldEff.efficiency.toFixed(3)} → ${newEff.efficiency.toFixed(3)} (${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(1)}%).
-            Vitesse moyenne ${speedDelta >= 0 ? '+' : ''}${speedDelta.toFixed(1)} km/h, FC moyenne ${hrDelta >= 0 ? '+' : ''}${hrDelta.toFixed(0)} bpm
-            (${older.length} sortie${older.length > 1 ? 's' : ''} ancienne${older.length > 1 ? 's' : ''} vs ${recent.length} récente${recent.length > 1 ? 's' : ''}).
-            ${isFragile ? ' Encore peu de sorties dans cette catégorie : à confirmer avec plus de données.' : ''}
-          </div>
-        </div>
-      </div>`;
-  }
-
-  if (!anyInsight) {
-    html += `<div class="insight neutral"><div class="icon">i</div><div class="text">Pas encore de sorties avec FC dans une catégorie de terrain pour comparer.</div></div>`;
-  }
-
-  html += `</div>`;
-  return html;
-}
-
-function renderSpeedHrChart(canvasId, activitiesAll) {
-  const active = activitiesAll.filter(a => !excludedIds.includes(a.id));
-  const sorted = active
-    .filter(a => a.average_speed && a.average_speed > 0)
-    .sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
-
-  const ctx = document.getElementById(canvasId);
-  if (!ctx) return;
-  if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
-
-  if (sorted.length === 0) {
-    ctx.parentElement.innerHTML += '<p style="color:var(--ink-soft);font-size:13px;">Pas de données de vitesse exploitables.</p>';
+  if (RBT.state.activities.length === 0) {
+    els.emptyState.style.display = 'block';
+    els.emptyState.innerHTML = '<h2>Aucune activité</h2><p>Clique sur Sync pour récupérer tes données Strava.</p>';
     return;
   }
 
-  const speeds = sorted.map(a => +(a.average_speed * 3.6).toFixed(1));
-  const hrs = sorted.map(a => a.average_heartrate ? Math.round(a.average_heartrate) : null);
-  const validHrs = hrs.filter(h => h !== null);
+  els.content.style.display = 'block';
 
-  // Bornes calculées à la main : Chart.js a tendance à aligner visuellement les deux axes
-  // si on ne fixe pas explicitement min/max sur celui de gauche, ce qui rend la courbe de
-  // vitesse (15-25 km/h) plate à côté de celle de FC (100-180 bpm) sur une même échelle 0-180.
-  const speedMin = Math.max(0, Math.floor(Math.min(...speeds) - 3));
-  const speedMax = Math.ceil(Math.max(...speeds) + 3);
+  const rides = RBT.getRides().filter(a => !RBT.state.excludedIds.includes(a.id));
+  const runs = RBT.getRuns().filter(a => !RBT.state.excludedIds.includes(a.id));
+  const totalKm = [...rides, ...runs].reduce((s, a) => s + a.distance, 0) / 1000;
+  const totalTime = [...rides, ...runs].reduce((s, a) => s + a.moving_time, 0);
+  const totalDplus = [...rides, ...runs].reduce((s, a) => s + a.total_elevation_gain, 0);
 
-  chartInstances[canvasId] = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: sorted.map(a => fmtDate(a.start_date)),
-      datasets: [
-        {
-          label: 'Vitesse moy. (km/h)',
-          data: speeds,
-          borderColor: '#b85c38',
-          backgroundColor: '#b85c38',
-          yAxisID: 'ySpeed',
-          tension: 0.3,
-          spanGaps: true,
-          pointRadius: 3,
-        },
-        {
-          label: 'FC moy. (bpm)',
-          data: hrs,
-          borderColor: '#5c7a4f',
-          backgroundColor: '#5c7a4f',
-          yAxisID: 'yHr',
-          tension: 0.3,
-          spanGaps: true,
-          pointRadius: 3,
-          hidden: validHrs.length === 0,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      interaction: { mode: 'index', intersect: false },
-      scales: {
-        ySpeed: {
-          type: 'linear',
-          position: 'left',
-          min: speedMin,
-          max: speedMax,
-          title: { display: true, text: 'km/h' },
-        },
-        yHr: {
-          type: 'linear',
-          position: 'right',
-          min: 80,
-          max: 200,
-          title: { display: true, text: 'bpm' },
-          grid: { drawOnChartArea: false },
-        },
-      },
-      plugins: { legend: { position: 'bottom' } },
-    },
-  });
-}
+  const lastRide = rides[0];
+  const lastRun = runs[0];
 
-function renderMonthlyKmChart(canvasId, activitiesAll) {
-  const active = activitiesAll.filter(a => !excludedIds.includes(a.id));
-  const ctx = document.getElementById(canvasId);
-  if (!ctx) return;
-  if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
+  els.content.innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card"><div class="label">Sorties totales</div><div class="value">${rides.length + runs.length}</div></div>
+      <div class="stat-card"><div class="label">Distance cumulée</div><div class="value">${totalKm.toFixed(0)}<span class="unit">km</span></div></div>
+      <div class="stat-card"><div class="label">D+ cumulé</div><div class="value">${Math.round(totalDplus)}<span class="unit">m</span></div></div>
+      <div class="stat-card"><div class="label">Temps cumulé</div><div class="value">${(totalTime / 3600).toFixed(0)}<span class="unit">h</span></div></div>
+    </div>
 
-  const byMonth = {};
-  active.forEach(a => {
-    const d = new Date(a.start_date);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    byMonth[key] = (byMonth[key] || 0) + a.distance / 1000;
-  });
-
-  const sortedKeys = Object.keys(byMonth).sort();
-  const labels = sortedKeys.map(k => {
-    const [y, m] = k.split('-');
-    return fmtMonthLabel(`${y}-${m}-01`);
-  });
-  const values = sortedKeys.map(k => +byMonth[k].toFixed(0));
-
-  chartInstances[canvasId] = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Distance (km)',
-        data: values,
-        backgroundColor: '#b85c38',
-        borderRadius: 4,
-      }],
-    },
-    options: {
-      responsive: true,
-      scales: { y: { beginAtZero: true, title: { display: true, text: 'km' } } },
-      plugins: { legend: { display: false } },
-    },
-  });
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+      <a href="velo.html" class="panel" style="display: block; transition: border-color 0.15s;">
+        <h3>Vélo</h3>
+        <div class="panel-sub">${rides.length} sortie${rides.length > 1 ? 's' : ''}${lastRide ? ` — dernière le ${RBT.fmtDate(RBT.effectiveDate(lastRide))}` : ''}</div>
+        <div class="mono" style="font-size: 13px; color: var(--ink-soft);">
+          ${lastRide ? `${RBT.fmtKm(lastRide.distance)} km · ${Math.round(lastRide.total_elevation_gain)} m D+ · ${RBT.fmtSpeed(lastRide.average_speed)} km/h moy.` : 'Pas encore de sortie'}
+        </div>
+      </a>
+      <a href="course.html" class="panel" style="display: block; transition: border-color 0.15s;">
+        <h3>Course à pied</h3>
+        <div class="panel-sub">${runs.length} sortie${runs.length > 1 ? 's' : ''}${lastRun ? ` — dernière le ${RBT.fmtDate(RBT.effectiveDate(lastRun))}` : ''}</div>
+        <div class="mono" style="font-size: 13px; color: var(--ink-soft);">
+          ${lastRun ? `${RBT.fmtKm(lastRun.distance)} km · ${RBT.fmtSpeed(lastRun.average_speed)} km/h moy.` : 'Pas encore de sortie'}
+        </div>
+      </a>
+    </div>
+  `;
 }
 
 init();
