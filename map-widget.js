@@ -7,7 +7,7 @@
    (restreinte au domaine jeremy1277.github.io dans la console Google Cloud).
    =========================================================== */
 
-const GOOGLE_MAPS_API_KEY = 'COLLE_TA_CLE_GOOGLE_MAPS_ICI';
+const GOOGLE_MAPS_API_KEY = 'AIzaSyCz_vkQaCbEz2kgvwHB9c9UtaRPu0G011g';
 
 const RBTMap = {
   _map: null,
