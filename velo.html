@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vélo — Run &amp; Bike Trainer</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="nav"></div>
+
+<div class="relief-hero">
+  <div id="relief-svg-container"></div>
+  <div class="relief-content">
+    <div class="relief-eyebrow">Vélo gravel</div>
+    <div class="relief-title">Carnet de route</div>
+    <div class="relief-sub">Analyse, progression et plan d'entraînement vélo</div>
+  </div>
+</div>
+
+<main>
+  <div id="emptyState" class="empty-state" style="display:none;"></div>
+  <div id="loadingState" class="loading-msg">Chargement...</div>
+  <div id="content" style="display:none;"></div>
+</main>
+
+<div id="modalContainer"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="shared.js"></script>
+<script src="coach-render.js"></script>
+<script src="map-widget.js"></script>
+<script src="drive-export.js"></script>
+<script>
+document.getElementById('nav').outerHTML = RBT.renderNav('velo');
+document.getElementById('relief-svg-container').outerHTML = RBT.renderReliefSvg();
+
+const els = {
+  emptyState: document.getElementById('emptyState'),
+  loadingState: document.getElementById('loadingState'),
+  content: document.getElementById('content'),
+};
+
+const chartInstances = {};
+
+async function init() {
+  try {
+    const connected = await RBT.loadAll();
+    if (!connected) {
+      els.loadingState.style.display = 'none';
+      els.emptyState.style.display = 'block';
+      els.emptyState.innerHTML = '<h2>Pas encore connecté</h2><p>Retourne à l\'accueil pour connecter ton compte Strava.</p>';
+      return;
+    }
+    render();
+  } catch (err) {
+    els.loadingState.textContent = 'Erreur. Le serveur met parfois 1 minute à se réveiller — retourne à l\'accueil et clique Sync.';
+  }
+}
+
+function render() {
+  els.loadingState.style.display = 'none';
+  const rides = RBT.getRides();
+
+  if (rides.length === 0) {
+    els.emptyState.style.display = 'block';
+    els.emptyState.innerHTML = '<h2>Pas de sortie vélo</h2><p>Rien à analyser encore.</p>';
+    return;
+  }
+
+  els.content.style.display = 'block';
+  const active = rides.filter(a => !RBT.state.excludedIds.includes(a.id));
+
+  const totalKm = active.reduce((s, a) => s + a.distance, 0) / 1000;
+  const totalDplus = active.reduce((s, a) => s + a.total_elevation_gain, 0);
+  const totalTime = active.reduce((s, a) => s + a.moving_time, 0);
+  const withHr = active.filter(a => a.average_heartrate);
+  const avgHr = withHr.length ? withHr.reduce((s, a) => s + a.average_heartrate, 0) / withHr.length : null;
+  const excludedCount = rides.length - active.length;
+
+  els.content.innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card"><div class="label">Sorties</div><div class="value">${active.length}</div></div>
+      <div class="stat-card"><div class="label">Distance totale</div><div class="value">${totalKm.toFixed(0)}<span class="unit">km</span></div></div>
+      <div class="stat-card"><div class="label">D+ total</div><div class="value">${Math.round(totalDplus)}<span class="unit">m</span></div></div>
+      <div class="stat-card"><div class="label">Temps total</div><div class="value">${(totalTime / 3600).toFixed(0)}<span class="unit">h</span></div></div>
+      ${avgHr ? `<div class="stat-card"><div class="label">FC moyenne</div><div class="value">${avgHr.toFixed(0)}<span class="unit">bpm</span></div></div>` : ''}
+    </div>
+
+    ${RBTCoach.renderPanel('velo')}
+    ${RBTCoach.renderTimeline('velo')}
+    ${RBTMap.renderPanel('velo')}
+    ${renderInsights(active)}
+
+    <div class="panel">
+      <h3>Kilomètres par mois</h3>
+      <div class="panel-sub">Volume mensuel, sorties exclues non comptées</div>
+      <canvas id="chart-km" height="80"></canvas>
+    </div>
+
+    <div class="panel">
+      <h3>Évolution dans le temps</h3>
+      <div class="panel-sub">Vitesse moyenne et FC moyenne, sortie par sortie</div>
+      <div style="position: relative; height: 280px;">
+        <canvas id="chart-speed"></canvas>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head-row">
+        <div>
+          <h3>Toutes les sorties</h3>
+          <div class="panel-sub">${rides.length} activité${rides.length > 1 ? 's' : ''}${excludedCount ? `, ${excludedCount} exclue${excludedCount > 1 ? 's' : ''} de l'analyse` : ''} — clique une date pour la corriger</div>
+        </div>
+      </div>
+      <div class="row-head">
+        <div>Date</div><div>Sortie</div><div class="metric">Dist.</div><div class="metric">D+</div>
+        <div class="metric">Vit.</div><div class="metric">FC</div><div>Source</div><div class="action">Action</div>
+      </div>
+      ${rides.map(a => renderActivityRow(a)).join('')}
+    </div>
+  `;
+
+  RBTCoach.attachHandlers('velo', render);
+  RBTMap.attachHandlers('velo');
+  renderMonthlyKmChart('chart-km', active);
+  renderSpeedHrChart('chart-speed', active);
+  attachRowHandlers();
+}
+
+function renderActivityRow(a) {
+  const isExcluded = RBT.state.excludedIds.includes(a.id);
+  const isCorrected = !!RBT.state.dateOverrides[a.id];
+  return `
+    <div class="activity-row ${isExcluded ? 'excluded' : ''}">
+      <div class="date" data-id="${a.id}" data-edit-date title="Cliquer pour corriger la date">${RBT.fmtDate(RBT.effectiveDate(a))}${isCorrected ? ' *' : ''}</div>
+      <div class="name">${RBT.escapeHtml(a.name)}</div>
+      <div class="metric"><strong>${RBT.fmtKm(a.distance)}</strong> km</div>
+      <div class="metric"><strong>${Math.round(a.total_elevation_gain)}</strong> m</div>
+      <div class="metric"><strong>${RBT.fmtSpeed(a.average_speed)}</strong></div>
+      <div class="metric">${a.average_heartrate ? `<strong>${Math.round(a.average_heartrate)}</strong>` : '—'}</div>
+      <div class="source">${RBT.guessSource(a)}</div>
+      <div class="action">
+        ${isExcluded
+          ? `<button class="btn-ghost btn-small" data-id="${a.id}" data-include>Réinclure</button>`
+          : `<button class="btn-danger-ghost btn-small" data-id="${a.id}" data-exclude>Exclure</button>`}
+      </div>
+    </div>`;
+}
+
+function attachRowHandlers() {
+  document.querySelectorAll('[data-exclude]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await RBT.toggleExclude(Number(btn.dataset.id), true);
+      render();
+    });
+  });
+  document.querySelectorAll('[data-include]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await RBT.toggleExclude(Number(btn.dataset.id), false);
+      render();
+    });
+  });
+  document.querySelectorAll('[data-edit-date]').forEach(el => {
+    el.addEventListener('click', () => openDateModal(Number(el.dataset.id)));
+  });
+}
+
+function openDateModal(activityId) {
+  const activity = RBT.state.activities.find(a => a.id === activityId);
+  if (!activity) return;
+  const currentDate = RBT.effectiveDate(activity).slice(0, 10);
+  const hasOverride = !!RBT.state.dateOverrides[activityId];
+
+  document.getElementById('modalContainer').innerHTML = `
+    <div class="rbt-modal-overlay" id="dateModalOverlay">
+      <div class="rbt-modal">
+        <h4>Corriger la date</h4>
+        <div class="modal-sub">${RBT.escapeHtml(activity.name)} — date Strava : ${RBT.fmtDate(activity.start_date)}</div>
+        <input type="date" id="dateModalInput" value="${currentDate}">
+        <div class="rbt-modal-actions">
+          ${hasOverride ? '<button class="btn-ghost btn-small" id="dateModalReset">Annuler la correction</button>' : ''}
+          <button class="btn-ghost btn-small" id="dateModalCancel">Fermer</button>
+          <button class="btn-signal btn-small" id="dateModalSave">Enregistrer</button>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('dateModalCancel').onclick = closeDateModal;
+  document.getElementById('dateModalOverlay').onclick = (e) => { if (e.target.id === 'dateModalOverlay') closeDateModal(); };
+  document.getElementById('dateModalSave').onclick = async () => {
+    const newDate = document.getElementById('dateModalInput').value;
+    if (!newDate) return;
+    await RBT.setDateOverride(activityId, new Date(newDate).toISOString());
+    closeDateModal();
+    render();
+  };
+  if (hasOverride) {
+    document.getElementById('dateModalReset').onclick = async () => {
+      await RBT.clearDateOverride(activityId);
+      closeDateModal();
+      render();
+    };
+  }
+}
+function closeDateModal() { document.getElementById('modalContainer').innerHTML = ''; }
+
+function renderInsights(activities) {
+  const withData = activities.filter(a => a.average_heartrate && a.average_speed && a.distance > 1000);
+  if (withData.length < 2) {
+    return `<div class="panel"><h3>Progression</h3><div class="panel-sub">Pas encore assez de données comparables (besoin d'au moins 2 sorties avec FC enregistrée).</div></div>`;
+  }
+
+  const groups = { plat: [], vallonne: [], montagneux: [] };
+  withData.forEach(a => {
+    const ratio = RBT.ratioDplusKm(a);
+    if (ratio < 5) groups.plat.push(a);
+    else if (ratio < 15) groups.vallonne.push(a);
+    else groups.montagneux.push(a);
+  });
+
+  const groupLabels = { plat: 'Terrain plat (< 5 m/km)', vallonne: 'Vallonné (5-15 m/km)', montagneux: 'Montagneux (15+ m/km)' };
+  let html = `<div class="panel"><h3>Progression par type de terrain</h3><div class="panel-sub">Comparaison vitesse-à-FC-équivalente entre tes sorties les plus anciennes et les plus récentes de chaque groupe</div>`;
+  let anyInsight = false;
+
+  for (const key of ['plat', 'vallonne', 'montagneux']) {
+    const group = groups[key].sort((a, b) => new Date(RBT.effectiveDate(a)) - new Date(RBT.effectiveDate(b)));
+    if (group.length < 2) continue;
+    anyInsight = true;
+
+    const isFragile = group.length < 4;
+    const half = Math.max(1, Math.floor(group.length / 2));
+    const older = group.slice(0, half);
+    const recent = group.slice(-half);
+
+    const effRatio = (arr) => {
+      const valid = arr.filter(a => a.average_heartrate > 0);
+      if (!valid.length) return null;
+      const avgSpeedKmh = valid.reduce((s, a) => s + a.average_speed * 3.6, 0) / valid.length;
+      const avgHr = valid.reduce((s, a) => s + a.average_heartrate, 0) / valid.length;
+      return { speed: avgSpeedKmh, hr: avgHr, efficiency: avgSpeedKmh / avgHr };
+    };
+
+    const oldEff = effRatio(older);
+    const newEff = effRatio(recent);
+    if (!oldEff || !newEff) continue;
+
+    const deltaPct = ((newEff.efficiency - oldEff.efficiency) / oldEff.efficiency) * 100;
+    const speedDelta = newEff.speed - oldEff.speed;
+    const hrDelta = newEff.hr - oldEff.hr;
+
+    let cls = 'neutral', icon = '→', verdict = 'Stable';
+    if (deltaPct > 3) { cls = 'up'; icon = '↑'; verdict = 'Progression'; }
+    else if (deltaPct < -3) { cls = 'down'; icon = '↓'; verdict = 'Régression'; }
+
+    html += `
+      <div class="insight ${cls}">
+        <div class="icon">${icon}</div>
+        <div class="text">
+          <strong>${groupLabels[key]} — ${verdict}</strong>
+          ${isFragile ? '<span class="tag">tendance fragile</span>' : ''}
+          <div class="detail">
+            Efficacité (vitesse/FC) : ${oldEff.efficiency.toFixed(3)} → ${newEff.efficiency.toFixed(3)} (${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(1)}%).
+            Vitesse moyenne ${speedDelta >= 0 ? '+' : ''}${speedDelta.toFixed(1)} km/h, FC moyenne ${hrDelta >= 0 ? '+' : ''}${hrDelta.toFixed(0)} bpm
+            (${older.length} sortie${older.length > 1 ? 's' : ''} ancienne${older.length > 1 ? 's' : ''} vs ${recent.length} récente${recent.length > 1 ? 's' : ''}).
+            ${isFragile ? ' Encore peu de sorties dans cette catégorie : à confirmer avec plus de données.' : ''}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  if (!anyInsight) {
+    html += `<div class="insight neutral"><div class="icon">i</div><div class="text">Pas encore de sorties avec FC dans une catégorie de terrain pour comparer.</div></div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+function renderSpeedHrChart(canvasId, activitiesAll) {
+  const sorted = activitiesAll
+    .filter(a => a.average_speed && a.average_speed > 0)
+    .sort((a, b) => new Date(RBT.effectiveDate(a)) - new Date(RBT.effectiveDate(b)));
+
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
+  if (sorted.length === 0) return;
+
+  const speeds = sorted.map(a => +(a.average_speed * 3.6).toFixed(1));
+  const hrs = sorted.map(a => a.average_heartrate ? Math.round(a.average_heartrate) : null);
+  const validHrs = hrs.filter(h => h !== null);
+  const speedMin = Math.max(0, Math.floor(Math.min(...speeds) - 3));
+  const speedMax = Math.ceil(Math.max(...speeds) + 3);
+
+  chartInstances[canvasId] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: sorted.map(a => RBT.fmtDate(RBT.effectiveDate(a))),
+      datasets: [
+        { label: 'Vitesse moy. (km/h)', data: speeds, borderColor: '#ff6b35', backgroundColor: '#ff6b35', yAxisID: 'ySpeed', tension: 0.3, spanGaps: true, pointRadius: 3 },
+        { label: 'FC moy. (bpm)', data: hrs, borderColor: '#4fd1a5', backgroundColor: '#4fd1a5', yAxisID: 'yHr', tension: 0.3, spanGaps: true, pointRadius: 3, hidden: validHrs.length === 0 },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        ySpeed: { type: 'linear', position: 'left', min: speedMin, max: speedMax, title: { display: true, text: 'km/h', color: '#ff6b35' }, ticks: { color: '#9aa1a9' }, grid: { color: '#2e343b' } },
+        yHr: { type: 'linear', position: 'right', min: 80, max: 200, title: { display: true, text: 'bpm', color: '#4fd1a5' }, ticks: { color: '#9aa1a9' }, grid: { drawOnChartArea: false } },
+        x: { ticks: { color: '#9aa1a9' }, grid: { color: '#2e343b' } },
+      },
+      plugins: { legend: { position: 'bottom', labels: { color: '#9aa1a9' } } },
+    },
+  });
+}
+
+function renderMonthlyKmChart(canvasId, activitiesAll) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
+
+  const byMonth = {};
+  activitiesAll.forEach(a => {
+    const d = new Date(RBT.effectiveDate(a));
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    byMonth[key] = (byMonth[key] || 0) + a.distance / 1000;
+  });
+
+  const sortedKeys = Object.keys(byMonth).sort();
+  const labels = sortedKeys.map(k => { const [y, m] = k.split('-'); return RBT.fmtMonthLabel(`${y}-${m}-01`); });
+  const values = sortedKeys.map(k => +byMonth[k].toFixed(0));
+
+  chartInstances[canvasId] = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Distance (km)', data: values, backgroundColor: '#ff6b35', borderRadius: 4 }] },
+    options: {
+      responsive: true,
+      scales: {
+        y: { beginAtZero: true, title: { display: true, text: 'km', color: '#9aa1a9' }, ticks: { color: '#9aa1a9' }, grid: { color: '#2e343b' } },
+        x: { ticks: { color: '#9aa1a9' }, grid: { display: false } },
+      },
+      plugins: { legend: { display: false } },
+    },
+  });
+}
+
+init();
+</script>
+</body>
+</html>
