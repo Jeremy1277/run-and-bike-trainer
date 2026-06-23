@@ -7,7 +7,7 @@
    OpenRouteService (gratuite, openrouteservice.org).
    =========================================================== */
 
-const ORS_API_KEY = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImMyN2M1MmQwN2ZkYjQ5OGNiZWFhNWY3ZDEzNGVlMmY4IiwiaCI6Im11cm11cjY0In0=';
+const ORS_API_KEY = 'COLLE_TA_CLE_OPENROUTESERVICE_ICI';
 
 const RBTMap = {
   _map: null,
@@ -117,9 +117,16 @@ const RBTMap = {
     const summary = feature.properties.summary;
 
     let elevationGain = 0;
+    let cumulativeDistance = 0;
+    const elevationProfile = [{ distanceKm: 0, elevation: coords[0][2] }];
+
     for (let i = 1; i < coords.length; i++) {
       const delta = coords[i][2] - coords[i - 1][2];
       if (delta > 0) elevationGain += delta;
+
+      const segmentDistance = RBTMap._haversine(coords[i - 1][1], coords[i - 1][0], coords[i][1], coords[i][0]);
+      cumulativeDistance += segmentDistance;
+      elevationProfile.push({ distanceKm: cumulativeDistance, elevation: coords[i][2] });
     }
 
     const path = coords.map((c) => [c[1], c[0]]);
@@ -128,8 +135,24 @@ const RBTMap = {
       path,
       actualDistanceKm: summary.distance / 1000,
       elevationGain: Math.round(elevationGain),
+      elevationProfile,
       bearingDeg,
     };
+  },
+
+  _haversine(lat1, lng1, lat2, lng2) {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  },
+
+  // Construit un lien OpenStreetMap centré sur le point de départ, pour navigation sur le terrain.
+  // (OSM n'a pas de "navigation turn-by-turn" partageable par URL comme Google Maps, donc on
+  // ouvre la carte centrée sur le point de départ — le coureur/cycliste suit le tracé visuellement.)
+  _osmNavigationUrl(originLat, originLng) {
+    return `https://www.openstreetmap.org/directions?from=&to=${originLat},${originLng}#map=15/${originLat}/${originLng}`;
   },
 
   async _search(sport) {
@@ -229,19 +252,162 @@ const RBTMap = {
 
       RBTMap._map.fitBounds(RBTMap._routeLayers[0].getBounds(), { padding: [20, 20] });
 
+      RBTMap._currentCandidates = top3;
+      RBTMap._currentOrigin = origin;
+      RBTMap._selectedIndex = 0;
+
       resultsEl.innerHTML = top3.map((c, i) => `
-        <div class="map-result-item" style="border-left: 3px solid ${colors[i]};">
+        <div class="map-result-item" data-select-loop="${i}" style="border-left: 3px solid ${colors[i]}; cursor: pointer;">
           <div>
             <div class="map-result-name">Boucle ${i + 1} ${i === 0 ? '— recommandée' : ''}</div>
             <div class="map-result-meta">${c.actualDistanceKm.toFixed(1)} km · ${c.elevationGain} m D+</div>
           </div>
         </div>
       `).join('') + (targetElevation ? `<div class="map-result-meta" style="margin-top:8px;">Cible séance : ~${targetDistanceKm} km, ~${targetElevation} m D+ (terrain ${RBTMap._activeSeance.type_terrain})</div>` : '');
+
+      resultsEl.querySelectorAll('[data-select-loop]').forEach((item) => {
+        item.addEventListener('click', () => RBTMap._selectLoop(sport, Number(item.dataset.selectLoop)));
+      });
+      RBTMap._highlightSelected();
     } catch (err) {
       resultsEl.innerHTML = `<div class="map-result-item"><span class="map-result-name">${RBT.escapeHtml(err.message)}</span></div>`;
     }
 
     btn.disabled = false;
     btn.textContent = 'Générer un parcours';
+  },
+
+  // Met une boucle en avant sur la carte (les autres s'atténuent) et ouvre son détail.
+  _selectLoop(sport, index) {
+    RBTMap._selectedIndex = index;
+    RBTMap._highlightSelected();
+    RBTMap._showLoopDetail(sport, index);
+  },
+
+  _highlightSelected() {
+    RBTMap._routeLayers.forEach((layer, i) => {
+      const isSelected = i === RBTMap._selectedIndex;
+      layer.setStyle({ weight: isSelected ? 5 : 3, opacity: isSelected ? 0.95 : 0.3 });
+      if (isSelected) layer.bringToFront();
+    });
+    document.querySelectorAll('[data-select-loop]').forEach((item) => {
+      const isSelected = Number(item.dataset.selectLoop) === RBTMap._selectedIndex;
+      item.style.opacity = isSelected ? '1' : '0.55';
+    });
+  },
+
+  _showLoopDetail(sport, index) {
+    const candidate = RBTMap._currentCandidates[index];
+    const origin = RBTMap._currentOrigin;
+    if (!candidate) return;
+
+    const profile = candidate.elevationProfile;
+    const navUrl = RBTMap._osmNavigationUrl(origin.lat, origin.lng);
+
+    const elevations = profile.map((p) => p.elevation);
+    const altMax = Math.round(Math.max(...elevations));
+    const altMin = Math.round(Math.min(...elevations));
+    const avgGrade = candidate.actualDistanceKm > 0
+      ? ((candidate.elevationGain / (candidate.actualDistanceKm * 1000)) * 100).toFixed(1)
+      : '0.0';
+
+    // Temps/vitesse estimés : hypothèses prudentes, ajustées si une séance est active.
+    const speedAssumed = sport === 'course' ? 9 : 18;
+    const estimatedMin = Math.round((candidate.actualDistanceKm / speedAssumed) * 60);
+
+    const modalContainer = document.getElementById('modalContainer');
+    modalContainer.innerHTML = `
+      <div class="rbt-modal-overlay" id="loopDetailOverlay">
+        <div class="rbt-modal" style="max-width: 560px;">
+          <h4>Boucle ${index + 1}${index === 0 ? ' — recommandée' : ''}</h4>
+          <div class="timeline-meta" style="margin: 8px 0 16px; flex-wrap: wrap;">
+            <span class="timeline-badge">${candidate.actualDistanceKm.toFixed(1)} km</span>
+            <span class="timeline-badge">${candidate.elevationGain} m D+</span>
+            <span class="timeline-badge">${altMin}-${altMax} m alt.</span>
+            <span class="timeline-badge">${avgGrade}% pente moy.</span>
+            <span class="timeline-badge">~${estimatedMin} min (${speedAssumed} km/h)</span>
+          </div>
+          <div style="position: relative; height: 160px; margin-bottom: 18px;">
+            <canvas id="loopElevationChart"></canvas>
+          </div>
+          <div class="rbt-modal-actions" style="justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; gap: 8px;">
+              <a href="${navUrl}" target="_blank" rel="noopener" class="btn-ghost btn-small" style="text-decoration: none; display: inline-flex; align-items: center;">Voir sur OSM</a>
+              <button class="btn-ghost btn-small" id="loopDetailExportGpx">Télécharger le GPX</button>
+            </div>
+            <button class="btn-signal btn-small" id="loopDetailClose">Fermer</button>
+          </div>
+        </div>
+      </div>`;
+
+    document.getElementById('loopDetailClose').onclick = () => { modalContainer.innerHTML = ''; };
+    document.getElementById('loopDetailOverlay').onclick = (e) => {
+      if (e.target.id === 'loopDetailOverlay') modalContainer.innerHTML = '';
+    };
+    document.getElementById('loopDetailExportGpx').onclick = () => RBTMap._exportGpx(sport, candidate, index);
+
+    if (window.Chart) {
+      const ctx = document.getElementById('loopElevationChart');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: profile.map((p) => p.distanceKm.toFixed(1)),
+          datasets: [{
+            data: profile.map((p) => Math.round(p.elevation)),
+            borderColor: '#ff6b35',
+            backgroundColor: 'rgba(255, 107, 53, 0.15)',
+            fill: true,
+            pointRadius: 0,
+            tension: 0.2,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { title: { display: true, text: 'km', color: '#9aa1a9' }, ticks: { color: '#9aa1a9', maxTicksLimit: 8 }, grid: { color: '#2e343b' } },
+            y: { title: { display: true, text: 'altitude (m)', color: '#9aa1a9' }, ticks: { color: '#9aa1a9' }, grid: { color: '#2e343b' } },
+          },
+        },
+      });
+    }
+  },
+
+  // Construit un fichier GPX Track (compatible iGPSport et la plupart des GPS/applis vélo)
+  // et déclenche son téléchargement dans le navigateur.
+  _exportGpx(sport, candidate, index) {
+    const sportLabel = sport === 'course' ? 'Course' : 'Velo';
+    // iGPSport exige un nom limité aux lettres/chiffres/tirets, 28 caractères max.
+    const rawName = `${sportLabel}-Boucle${index + 1}-${Math.round(candidate.actualDistanceKm)}km`;
+    const safeName = rawName.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 28);
+
+    const trackPoints = candidate.path.map((coord, i) => {
+      const elevation = candidate.elevationProfile[i] ? candidate.elevationProfile[i].elevation : 0;
+      return `      <trkpt lat="${coord[0]}" lon="${coord[1]}"><ele>${elevation.toFixed(1)}</ele></trkpt>`;
+    }).join('\n');
+
+    const gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Run and Bike Trainer" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>${safeName}</name>
+  </metadata>
+  <trk>
+    <name>${safeName}</name>
+    <trkseg>
+${trackPoints}
+    </trkseg>
+  </trk>
+</gpx>`;
+
+    const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${safeName}.gpx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   },
 };
