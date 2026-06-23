@@ -623,29 +623,41 @@ function renderSpeedHrChart(canvasId, activitiesAll) {
     return;
   }
 
+  const speeds = sorted.map(a => +(a.average_speed * 3.6).toFixed(1));
+  const hrs = sorted.map(a => a.average_heartrate ? Math.round(a.average_heartrate) : null);
+  const validHrs = hrs.filter(h => h !== null);
+
+  // Bornes calculées à la main : Chart.js a tendance à aligner visuellement les deux axes
+  // si on ne fixe pas explicitement min/max sur celui de gauche, ce qui rend la courbe de
+  // vitesse (15-25 km/h) plate à côté de celle de FC (100-180 bpm) sur une même échelle 0-180.
+  const speedMin = Math.max(0, Math.floor(Math.min(...speeds) - 3));
+  const speedMax = Math.ceil(Math.max(...speeds) + 3);
+
   chartInstances[canvasId] = new Chart(ctx, {
+    type: 'line',
     data: {
       labels: sorted.map(a => fmtDate(a.start_date)),
       datasets: [
         {
-          type: 'line',
           label: 'Vitesse moy. (km/h)',
-          data: sorted.map(a => +(a.average_speed * 3.6).toFixed(1)),
+          data: speeds,
           borderColor: '#b85c38',
           backgroundColor: '#b85c38',
-          yAxisID: 'y',
+          yAxisID: 'ySpeed',
           tension: 0.3,
           spanGaps: true,
+          pointRadius: 3,
         },
         {
-          type: 'line',
           label: 'FC moy. (bpm)',
-          data: sorted.map(a => a.average_heartrate ? Math.round(a.average_heartrate) : null),
+          data: hrs,
           borderColor: '#5c7a4f',
           backgroundColor: '#5c7a4f',
-          yAxisID: 'y1',
+          yAxisID: 'yHr',
           tension: 0.3,
           spanGaps: true,
+          pointRadius: 3,
+          hidden: validHrs.length === 0,
         },
       ],
     },
@@ -653,8 +665,21 @@ function renderSpeedHrChart(canvasId, activitiesAll) {
       responsive: true,
       interaction: { mode: 'index', intersect: false },
       scales: {
-        y: { type: 'linear', position: 'left', title: { display: true, text: 'km/h' }, beginAtZero: false },
-        y1: { type: 'linear', position: 'right', title: { display: true, text: 'bpm' }, grid: { drawOnChartArea: false }, beginAtZero: false },
+        ySpeed: {
+          type: 'linear',
+          position: 'left',
+          min: speedMin,
+          max: speedMax,
+          title: { display: true, text: 'km/h' },
+        },
+        yHr: {
+          type: 'linear',
+          position: 'right',
+          min: 80,
+          max: 200,
+          title: { display: true, text: 'bpm' },
+          grid: { drawOnChartArea: false },
+        },
       },
       plugins: { legend: { position: 'bottom' } },
     },
