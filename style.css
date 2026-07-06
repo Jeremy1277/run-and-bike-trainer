@@ -384,9 +384,11 @@ main { max-width: 1080px; margin: 0 auto; padding: 8px 24px 24px; }
 .rbt-modal-overlay {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.6);
-  display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: flex-start; justify-content: center;
   z-index: 100;
   padding: 20px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .rbt-modal {
   background: var(--bg-card);
@@ -395,6 +397,10 @@ main { max-width: 1080px; margin: 0 auto; padding: 8px 24px 24px; }
   padding: 24px;
   max-width: 360px;
   width: 100%;
+  margin: max(20px, env(safe-area-inset-top)) auto max(20px, env(safe-area-inset-bottom));
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .rbt-modal h4 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
 .rbt-modal .modal-sub { font-size: 13px; color: var(--ink-soft); margin-bottom: 16px; }
