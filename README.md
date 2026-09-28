@@ -9,6 +9,9 @@ plus que des redirections, qui reportent la chaîne de requête : le backend
 Strava renvoie ici avec `?connected=true` ou `?strava_error=…` tant que la
 variable `FRONTEND_URL` n'a pas été changée sur Render.
 
+Les trois pointent vers l'accueil : l'application ne fait plus qu'une page,
+`velo.html` et `course.html` ont été fusionnées dedans.
+
 Le reste des fichiers est conservé tel quel : la dernière version fonctionnelle
 servie depuis ce dépôt est le commit `17d6c62`.
 
