@@ -3,137 +3,33 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Run &amp; Bike Trainer</title>
-<link rel="stylesheet" href="style.css">
+<title>Run &amp; Bike Trainer — déménagé</title>
+<meta name="robots" content="noindex">
+<link rel="canonical" href="https://studio-42.app/run-and-bike/">
+<script>
+  /* On reporte la chaîne de requête ET l'ancre : le backend Strava renvoie
+     ici avec ?connected=true ou ?strava_error=..., et ces paramètres doivent
+     atteindre la vraie application. */
+  location.replace('https://studio-42.app/run-and-bike/' + location.search + location.hash);
+</script>
+<noscript><meta http-equiv="refresh" content="0; url=https://studio-42.app/run-and-bike/"></noscript>
+<style>
+  body{margin:0;min-height:100vh;display:grid;place-items:center;background:#14171a;color:#f5f3ee;
+       font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:24px}
+  .b{max-width:30em;text-align:center;line-height:1.55}
+  .e{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#ff6b35;margin:0 0 10px}
+  h1{font-size:23px;font-weight:600;margin:0 0 10px}
+  p{color:#9aa1a9;font-size:15px;margin:0 0 20px}
+  a{display:inline-block;background:#ff6b35;color:#14171a;font-weight:600;text-decoration:none;
+    padding:13px 22px;border-radius:8px}
+</style>
 </head>
 <body>
-
-<div id="nav"></div>
-
-<div class="relief-hero">
-  <div id="relief-svg-container"></div>
-  <div class="relief-content">
-    <div class="relief-eyebrow">Run &amp; Bike Trainer</div>
-    <div class="relief-title">Bord de piste</div>
-    <div class="relief-sub">Vue d'ensemble — vélo gravel &amp; course à pied</div>
-    <div class="status-bar">
-      <div class="dot off" id="statusDot"></div>
-      <span id="statusText">Connexion...</span>
-      <button class="btn-ghost" id="syncBtn" style="margin-left: auto;">Sync</button>
-      <button class="btn-signal" id="connectBtn" style="display:none;">Se connecter à Strava</button>
-    </div>
+  <div class="b">
+    <p class="e">Run &amp; Bike Trainer</p>
+    <h1>L'application a déménagé</h1>
+    <p>Elle vit maintenant sur studio-42.app. Tu devrais y être redirigé tout de suite.</p>
+    <a href="https://studio-42.app/run-and-bike/">Ouvrir l'application</a>
   </div>
-</div>
-
-<main>
-  <div id="emptyState" class="empty-state" style="display:none;"></div>
-  <div id="loadingState" class="loading-msg">Chargement...</div>
-  <div id="content" style="display:none;"></div>
-</main>
-
-<script src="shared.js"></script>
-<script>
-document.getElementById('nav').outerHTML = RBT.renderNav('home');
-document.getElementById('relief-svg-container').outerHTML = RBT.renderReliefSvg();
-
-const els = {
-  statusDot: document.getElementById('statusDot'),
-  statusText: document.getElementById('statusText'),
-  syncBtn: document.getElementById('syncBtn'),
-  connectBtn: document.getElementById('connectBtn'),
-  emptyState: document.getElementById('emptyState'),
-  loadingState: document.getElementById('loadingState'),
-  content: document.getElementById('content'),
-};
-
-async function init() {
-  try {
-    const connected = await RBT.loadAll();
-
-    if (!connected) {
-      els.statusText.textContent = 'Non connecté';
-      els.connectBtn.style.display = 'inline-block';
-      els.loadingState.style.display = 'none';
-      els.emptyState.style.display = 'block';
-      els.emptyState.innerHTML = '<h2>Pas encore connecté</h2><p>Connecte ton compte Strava pour voir tes données.</p>';
-      return;
-    }
-
-    els.statusDot.classList.remove('off');
-    els.statusText.textContent = `Connecté — ${RBT.state.athlete.firstname} ${RBT.state.athlete.lastname}`;
-    render();
-  } catch (err) {
-    els.statusText.textContent = 'Erreur de connexion au serveur';
-    els.loadingState.textContent = 'Le serveur met parfois 1 minute à se réveiller (free tier). Réessaie dans un instant avec Sync.';
-  }
-}
-
-els.connectBtn.addEventListener('click', () => {
-  window.location.href = `${API_BASE}/auth/strava`;
-});
-
-els.syncBtn.addEventListener('click', async () => {
-  els.syncBtn.disabled = true;
-  els.syncBtn.textContent = 'Sync...';
-  try {
-    await RBT.sync();
-    await RBT.loadAll();
-    render();
-  } catch (err) {
-    alert('Erreur de synchronisation. Le serveur met parfois 1 minute à se réveiller, réessaie.');
-  }
-  els.syncBtn.disabled = false;
-  els.syncBtn.textContent = 'Sync';
-});
-
-function render() {
-  els.loadingState.style.display = 'none';
-
-  if (RBT.state.activities.length === 0) {
-    els.emptyState.style.display = 'block';
-    els.emptyState.innerHTML = '<h2>Aucune activité</h2><p>Clique sur Sync pour récupérer tes données Strava.</p>';
-    return;
-  }
-
-  els.content.style.display = 'block';
-
-  const rides = RBT.getRides().filter(a => !RBT.state.excludedIds.includes(a.id));
-  const runs = RBT.getRuns().filter(a => !RBT.state.excludedIds.includes(a.id));
-  const totalKm = [...rides, ...runs].reduce((s, a) => s + a.distance, 0) / 1000;
-  const totalTime = [...rides, ...runs].reduce((s, a) => s + a.moving_time, 0);
-  const totalDplus = [...rides, ...runs].reduce((s, a) => s + a.total_elevation_gain, 0);
-
-  const lastRide = rides[0];
-  const lastRun = runs[0];
-
-  els.content.innerHTML = `
-    <div class="stat-grid">
-      <div class="stat-card"><div class="label">Sorties totales</div><div class="value">${rides.length + runs.length}</div></div>
-      <div class="stat-card"><div class="label">Distance cumulée</div><div class="value">${totalKm.toFixed(0)}<span class="unit">km</span></div></div>
-      <div class="stat-card"><div class="label">D+ cumulé</div><div class="value">${Math.round(totalDplus)}<span class="unit">m</span></div></div>
-      <div class="stat-card"><div class="label">Temps cumulé</div><div class="value">${(totalTime / 3600).toFixed(0)}<span class="unit">h</span></div></div>
-    </div>
-
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
-      <a href="velo.html" class="panel" style="display: block; transition: border-color 0.15s;">
-        <h3>Vélo</h3>
-        <div class="panel-sub">${rides.length} sortie${rides.length > 1 ? 's' : ''}${lastRide ? ` — dernière le ${RBT.fmtDate(RBT.effectiveDate(lastRide))}` : ''}</div>
-        <div class="mono" style="font-size: 13px; color: var(--ink-soft);">
-          ${lastRide ? `${RBT.fmtKm(lastRide.distance)} km · ${Math.round(lastRide.total_elevation_gain)} m D+ · ${RBT.fmtSpeed(lastRide.average_speed)} km/h moy.` : 'Pas encore de sortie'}
-        </div>
-      </a>
-      <a href="course.html" class="panel" style="display: block; transition: border-color 0.15s;">
-        <h3>Course à pied</h3>
-        <div class="panel-sub">${runs.length} sortie${runs.length > 1 ? 's' : ''}${lastRun ? ` — dernière le ${RBT.fmtDate(RBT.effectiveDate(lastRun))}` : ''}</div>
-        <div class="mono" style="font-size: 13px; color: var(--ink-soft);">
-          ${lastRun ? `${RBT.fmtKm(lastRun.distance)} km · ${RBT.fmtSpeed(lastRun.average_speed)} km/h moy.` : 'Pas encore de sortie'}
-        </div>
-      </a>
-    </div>
-  `;
-}
-
-init();
-</script>
 </body>
 </html>
